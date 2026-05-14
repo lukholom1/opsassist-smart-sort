@@ -28,7 +28,7 @@ type Result = { id: string; category: string; priority: string } | null;
 
 function SubmitPage() {
   // useServerFn re-export from react-router doesn't exist; use the start hook
-  const submit = useFn(submitTicket);
+  const submit = useServerFn(submitTicket);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
