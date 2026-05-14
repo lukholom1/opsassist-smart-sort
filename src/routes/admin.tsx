@@ -25,6 +25,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
+type TicketStatus = "Open" | "In Progress" | "Resolved";
 type Ticket = {
   id: string;
   user_name: string;
@@ -32,6 +33,7 @@ type Ticket = {
   details: string;
   category: string;
   priority: string;
+  status: TicketStatus;
   created_at: string;
 };
 
