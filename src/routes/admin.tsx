@@ -286,6 +286,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <th className="px-4 py-3 font-medium">Ticket</th>
                     <th className="px-4 py-3 font-medium">Category</th>
                     <th className="px-4 py-3 font-medium">Priority</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Created</th>
                   </tr>
                 </thead>
@@ -307,6 +308,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       </td>
                       <td className="px-4 py-4">
                         <PriorityPill value={t.priority} />
+                      </td>
+                      <td className="px-4 py-4">
+                        <StatusSelector
+                          value={t.status}
+                          saving={savingId === t.id}
+                          onChange={(next) => changeStatus(t.id, next)}
+                        />
                       </td>
                       <td className="px-4 py-4 text-xs text-muted-foreground">
                         {new Date(t.created_at).toLocaleString()}
