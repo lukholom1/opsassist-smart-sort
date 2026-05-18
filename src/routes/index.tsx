@@ -4,7 +4,7 @@ import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import { Sparkles, LogIn } from "lucide-react";
+import { Sparkles, LogIn, ShieldCheck } from "lucide-react";
 
 // Home: redirect signed-in users to their role-specific dashboard.
 export const Route = createFileRoute("/")({
