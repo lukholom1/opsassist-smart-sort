@@ -329,6 +329,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       <td className="px-4 py-4 text-xs text-muted-foreground">
                         {new Date(t.created_at).toLocaleString()}
                       </td>
+                      <td className="px-4 py-4 text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setReplyTicket(t)}
+                          className="rounded-full"
+                        >
+                          <Sparkles size={14} className="mr-1.5 text-purple-accent" />
+                          AI reply
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -338,6 +349,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </main>
       <Footer />
+      <ResponseDialog
+        ticket={replyTicket}
+        onClose={() => setReplyTicket(null)}
+      />
     </div>
   );
 }
