@@ -136,6 +136,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [status, setStatus] = useState("all");
   const [query, setQuery] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [replyTicket, setReplyTicket] = useState<Ticket | null>(null);
 
   useEffect(() => {
     fetchTickets()
