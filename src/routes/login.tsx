@@ -53,9 +53,9 @@ function normalizeEmail(input: string) {
   return t.includes("@") ? t : `${t}@opsassist.local`;
 }
 
-function SignInForm({ onSwitch }: { onSwitch: () => void }) {
+function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdmin?: boolean }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(isAdmin ? "Admin" : "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
