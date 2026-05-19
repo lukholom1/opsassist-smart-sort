@@ -73,7 +73,11 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
       setError("Invalid credentials. Try again.");
       return;
     }
-    navigate({ to: "/" });
+    if (isAdmin) {
+      navigate({ to: "/admin" });
+    } else {
+      navigate({ to: "/" });
+    }
   }
 
   return (
