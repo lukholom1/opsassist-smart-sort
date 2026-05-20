@@ -20,169 +20,70 @@ function heuristicClassify(
   details: string,
 ): { categories: Department[]; priority: Priority } {
   const text = `${title} ${details}`.toLowerCase();
-
   const cats = new Set<Department>();
-
-  if (
-    /(payroll|salary|leave|hr|hiring|benefit|vacation|holiday|harass|discriminat|onboard)/.test(
-      text,
-    )
-  ) {
-    cats.add("HR");
-  }
-
-  if (
-    /(laptop|wifi|wi-fi|vpn|server|password|login|software|computer|email|network|system|bug|outage|router|access point|printer)/.test(
-      text,
-    )
-  ) {
-    cats.add("IT");
-  }
-
-  if (
-    /(invoice|payment|reimburs|finance|budget|expense|tax|refund|salary|payroll)/.test(
-      text,
-    )
-  ) {
-    cats.add("Finance");
-  }
-
-  if (
-    /(facilit|office|ceiling|door|cleaning|supplies|building|maintenance|elevator|hvac|operations|logistics)/.test(
-      text,
-    )
-  ) {
-    cats.add("Operations");
-  }
-
-  if (cats.size === 0) {
-    cats.add("Operations");
-  }
+  if (/(payroll|salary|leave|hr|hiring|benefit|vacation|holiday|harass|discriminat|onboard)/.test(text)) cats.add("HR");
+  if (/(laptop|wifi|wi-fi|vpn|server|password|login|software|computer|email|network|system|bug|outage|router|access point|printer)/.test(text)) cats.add("IT");
+  if (/(invoice|payment|reimburs|finance|budget|expense|tax|refund|salary|payroll)/.test(text)) cats.add("Finance");
+  if (/(facilit|office|ceiling|door|cleaning|supplies|building|maintenance|elevator|hvac|operations|logistics)/.test(text)) cats.add("Operations");
+  if (cats.size === 0) cats.add("Operations");
 
   let priority: Priority = "Medium";
+  if (/(urgent|asap|immediately|critical|down|outage|cannot work|blocker|emergency)/.test(text)) priority = "High";
+  else if (/(whenever|low priority|minor|nice to have|sometime)/.test(text)) priority = "Low";
 
-  if (
-    /(urgent|asap|immediately|critical|down|outage|cannot work|blocker|emergency)/.test(
-      text,
-    )
-  ) {
-    priority = "High";
-  } else if (
-    /(whenever|low priority|minor|nice to have|sometime)/.test(text)
-  ) {
-    priority = "Low";
-  }
-
-  return {
-    categories: Array.from(cats),
-    priority,
-  };
+  return { categories: Array.from(cats), priority };
 }
 
 async function classifyWithAI(title: string, details: string) {
-  const apiKey = process.env.GOOGLE_API_KEY;
-
-  if (!apiKey) {
-    return heuristicClassify(title, details);
-  }
-
+  const apiKey = process.env.LOVABLE_API_KEY;
+  if (!apiKey) return heuristicClassify(title, details);
   try {
-    const prompt = `
-You are an AI ticket classifier.
-
-Classify the support request into one or more departments:
-HR, IT, Finance, Operations.
-
-Also determine priority:
-High, Medium, or Low.
-
-Return ONLY valid JSON.
-
-Example:
-{
-  "categories": ["IT", "Operations"],
-  "priority": "High"
-}
-
-Title: ${title}
-
-Details:
-${details}
-`;
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content:
+              'Classify business support tickets. A ticket may affect MULTIPLE departments. Respond ONLY with strict JSON like {"categories":["HR"|"IT"|"Finance"|"Operations"],"priority":"High"|"Medium"|"Low"}. Use one or more categories.',
           },
-        }),
-      },
-    );
-
-    if (!res.ok) {
-      console.error("Gemini API error:", await res.text());
-      return heuristicClassify(title, details);
-    }
-
-    const json = await res.json();
-
-    const content =
-      json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    const cleaned = content
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const parsed = JSON.parse(cleaned);
-
-    const fallback = heuristicClassify(title, details);
-
+          { role: "user", content: `Title: ${title}\nDetails: ${details}` },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return heuristicClassify(title, details);
+    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
+    const fb = heuristicClassify(title, details);
     const cats: Department[] = Array.isArray(parsed.categories)
-      ? parsed.categories.filter(
-          (c: unknown): c is Department =>
-            typeof c === "string" &&
-            (DEPARTMENTS as readonly string[]).includes(c),
+      ? parsed.categories.filter((c: unknown): c is Department =>
+          typeof c === "string" && (DEPARTMENTS as readonly string[]).includes(c),
         )
       : [];
-
     return {
-      categories: cats.length ? cats : fallback.categories,
-      priority: (
-        (PRIORITIES as readonly string[]).includes(parsed.priority)
-          ? parsed.priority
-          : fallback.priority
-      ) as Priority,
+      categories: cats.length ? cats : fb.categories,
+      priority: ((PRIORITIES as readonly string[]).includes(parsed.priority)
+        ? parsed.priority
+        : fb.priority) as Priority,
     };
-  } catch (err) {
-    console.error("Classification failed:", err);
+  } catch {
     return heuristicClassify(title, details);
   }
 }
 
 // ----------------------------- Load-balanced assignment -----------------------------
 
-async function pickLeastBusyAdminForDept(
-  dept: Department,
-): Promise<string | null> {
+// Pick the department admin (admin + profiles.department=dept) with the fewest active assignments.
+async function pickLeastBusyAdminForDept(dept: Department): Promise<string | null> {
+  // Admins with this department.
   const { data: profs } = await supabaseAdmin
     .from("profiles")
     .select("id")
     .eq("department", dept);
-
   const profIds = (profs ?? []).map((p) => p.id);
-
   if (profIds.length === 0) return null;
 
   const { data: roleRows } = await supabaseAdmin
@@ -190,9 +91,7 @@ async function pickLeastBusyAdminForDept(
     .select("user_id")
     .eq("role", "admin")
     .in("user_id", profIds);
-
   const adminIds = (roleRows ?? []).map((r) => r.user_id);
-
   if (adminIds.length === 0) return null;
 
   const { data: active } = await supabaseAdmin
@@ -201,19 +100,10 @@ async function pickLeastBusyAdminForDept(
     .in("status", ["Open", "In Progress"])
     .in("assigned_to", adminIds);
 
-  const counts = new Map(
-    adminIds.map((id) => [id, 0] as [string, number]),
-  );
-
+  const counts = new Map(adminIds.map((id) => [id, 0] as [string, number]));
   for (const row of active ?? []) {
-    if (row.assigned_to) {
-      counts.set(
-        row.assigned_to,
-        (counts.get(row.assigned_to) ?? 0) + 1,
-      );
-    }
+    if (row.assigned_to) counts.set(row.assigned_to, (counts.get(row.assigned_to) ?? 0) + 1);
   }
-
   return [...counts.entries()].sort((a, b) => a[1] - b[1])[0][0];
 }
 
@@ -228,11 +118,7 @@ export const submitTicket = createServerFn({ method: "POST" })
   .middleware([requireRole(["employee", "admin"])])
   .inputValidator((input: unknown) => SubmitSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { categories, priority } = await classifyWithAI(
-      data.title,
-      data.details,
-    );
-
+    const { categories, priority } = await classifyWithAI(data.title, data.details);
     const userName = context.profile?.full_name ?? "User";
 
     const { data: row, error } = await supabaseAdmin
@@ -242,15 +128,15 @@ export const submitTicket = createServerFn({ method: "POST" })
         user_name: userName,
         title: data.title,
         details: data.details,
-        category: categories[0],
+        category: categories[0], // legacy single field
         categories,
         priority,
       })
       .select("id")
       .single();
-
     if (error) throw new Error(error.message);
 
+    // Create per-department assignments with load balancing.
     const rows = await Promise.all(
       categories.map(async (dept) => ({
         ticket_id: row.id,
@@ -258,11 +144,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         assigned_to: await pickLeastBusyAdminForDept(dept),
       })),
     );
-
-    const { error: aerr } = await supabaseAdmin
-      .from("ticket_assignments")
-      .insert(rows);
-
+    const { error: aerr } = await supabaseAdmin.from("ticket_assignments").insert(rows);
     if (aerr) throw new Error(aerr.message);
 
     return { id: row.id, categories, priority };
@@ -284,74 +166,45 @@ export type AssignmentRow = {
 
 async function fetchAssignmentsForTickets(ticketIds: string[]) {
   const byTicket = new Map<string, AssignmentRow[]>();
-
   if (ticketIds.length === 0) return byTicket;
-
   const { data } = await supabaseAdmin
     .from("ticket_assignments")
     .select("*")
     .in("ticket_id", ticketIds);
-
   const rows = (data ?? []) as AssignmentRow[];
-
   for (const a of rows) {
     const arr = byTicket.get(a.ticket_id) ?? [];
     arr.push(a);
     byTicket.set(a.ticket_id, arr);
   }
-
   const assigneeIds = Array.from(
     new Set(rows.map((a) => a.assigned_to).filter((v): v is string => !!v)),
   );
-
   if (assigneeIds.length) {
     const { data: profs } = await supabaseAdmin
       .from("profiles")
       .select("id, full_name")
       .in("id", assigneeIds);
-
-    const nameById = new Map(
-      (profs ?? []).map((p) => [p.id, p.full_name]),
-    );
-
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
     for (const arr of byTicket.values()) {
       for (const a of arr) {
-        a.assignee_name = a.assigned_to
-          ? (nameById.get(a.assigned_to) ?? null)
-          : null;
+        a.assignee_name = a.assigned_to ? (nameById.get(a.assigned_to) ?? null) : null;
       }
     }
   }
-
   return byTicket;
 }
 
 async function fetchFeedbackForTickets(ticketIds: string[]) {
-  if (ticketIds.length === 0) {
-    return new Map<
-      string,
-      { rating: number; comment: string | null }
-    >();
-  }
-
+  if (ticketIds.length === 0) return new Map<string, { rating: number; comment: string | null }>();
   const { data } = await supabaseAdmin
     .from("ticket_feedback")
     .select("ticket_id, rating, comment")
     .in("ticket_id", ticketIds);
-
-  return new Map(
-    (data ?? []).map((f) => [
-      f.ticket_id,
-      {
-        rating: f.rating,
-        comment: f.comment,
-      },
-    ]),
-  );
+  return new Map((data ?? []).map((f) => [f.ticket_id, { rating: f.rating, comment: f.comment }]));
 }
 
-// ----------------------------- My Tickets -----------------------------
-
+// Caller's own tickets.
 export const listMyTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -360,16 +213,12 @@ export const listMyTickets = createServerFn({ method: "GET" })
       .select("*")
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
-
     if (error) throw new Error(error.message);
-
     const ids = (data ?? []).map((t) => t.id);
-
     const [assignments, feedback] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
     ]);
-
     return {
       tickets: (data ?? []).map((t) => ({
         ...t,
@@ -379,34 +228,27 @@ export const listMyTickets = createServerFn({ method: "GET" })
     };
   });
 
-// ----------------------------- Department Tickets -----------------------------
-
+// Department-scoped tickets for Department Admins (and all for Super Admins).
 export const listDeptTickets = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
   .handler(async ({ context }) => {
     const dept = context.department as Department | null;
-
     let q = supabaseAdmin
       .from("tickets")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000);
-
     if (dept) {
+      // department admin: only tickets that include their department
       q = q.contains("categories", [dept]);
     }
-
     const { data, error } = await q;
-
     if (error) throw new Error(error.message);
-
     const ids = (data ?? []).map((t) => t.id);
-
     const [assignments, feedback] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
     ]);
-
     return {
       isSuperAdmin: dept === null,
       department: dept,
@@ -414,10 +256,9 @@ export const listDeptTickets = createServerFn({ method: "GET" })
         ...t,
         assignments: assignments.get(t.id) ?? [],
         feedback: feedback.get(t.id) ?? null,
+        // Per-department status visible to this admin
         my_assignment:
-          (assignments.get(t.id) ?? []).find(
-            (a) => !dept || a.department === dept,
-          ) ?? null,
+          (assignments.get(t.id) ?? []).find((a) => !dept || a.department === dept) ?? null,
       })),
     };
   });
@@ -429,73 +270,43 @@ const UpdateAssignmentSchema = z.object({
   status: z.enum(STATUSES),
 });
 
-export const updateAssignmentStatus = createServerFn({
-  method: "POST",
-})
+export const updateAssignmentStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .inputValidator((input: unknown) =>
-    UpdateAssignmentSchema.parse(input),
-  )
+  .inputValidator((input: unknown) => UpdateAssignmentSchema.parse(input))
   .handler(async ({ data, context }) => {
     const dept = context.department as Department | null;
-
+    // Department admin may only touch own department assignments.
     if (dept) {
       const { data: row } = await supabaseAdmin
         .from("ticket_assignments")
         .select("department")
         .eq("id", data.assignment_id)
         .single();
-
-      if (row?.department !== dept) {
-        throw new Error("Not in your department.");
-      }
+      if (row?.department !== dept) throw new Error("Not in your department.");
     }
-
-    const patch: {
-      status: typeof data.status;
-      resolved_at?: string;
-    } = {
-      status: data.status,
-    };
-
-    if (data.status === "Resolved") {
-      patch.resolved_at = new Date().toISOString();
-    }
-
+    const patch: { status: typeof data.status; resolved_at?: string } = { status: data.status };
+    if (data.status === "Resolved") patch.resolved_at = new Date().toISOString();
     const { error } = await supabaseAdmin
       .from("ticket_assignments")
       .update(patch)
       .eq("id", data.assignment_id);
-
     if (error) throw new Error(error.message);
-
     return { ok: true };
   });
 
-// ----------------------------- Resolve by AI -----------------------------
-
-const ResolveByAiSchema = z.object({
-  id: z.string().uuid(),
-});
-
-export const markResolvedByAI = createServerFn({
-  method: "POST",
-})
+// User marks their ticket resolved by AI.
+const ResolveByAiSchema = z.object({ id: z.string().uuid() });
+export const markResolvedByAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    ResolveByAiSchema.parse(input),
-  )
+  .inputValidator((input: unknown) => ResolveByAiSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { data: t } = await supabaseAdmin
       .from("tickets")
       .select("user_id")
       .eq("id", data.id)
       .single();
-
-    if (t?.user_id !== context.userId) {
-      throw new Error("Not your ticket.");
-    }
-
+    if (t?.user_id !== context.userId) throw new Error("Not your ticket.");
+    // Resolve every assignment — trigger will then resolve the parent.
     const { error: aerr } = await supabaseAdmin
       .from("ticket_assignments")
       .update({
@@ -505,9 +316,8 @@ export const markResolvedByAI = createServerFn({
       })
       .eq("ticket_id", data.id)
       .neq("status", "Resolved");
-
     if (aerr) throw new Error(aerr.message);
-
+    // Also stamp the parent directly (trigger may not fire if there were 0 assignments).
     await supabaseAdmin
       .from("tickets")
       .update({
@@ -517,7 +327,6 @@ export const markResolvedByAI = createServerFn({
         resolution_source: "ai",
       })
       .eq("id", data.id);
-
     return { ok: true };
   });
 
@@ -529,90 +338,51 @@ const FeedbackSchema = z.object({
   comment: z.string().trim().max(1000).optional(),
 });
 
-export const submitFeedback = createServerFn({
-  method: "POST",
-})
+export const submitFeedback = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => FeedbackSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { data: t } = await supabaseAdmin
       .from("tickets")
-      .select(
-        "user_id, status, resolution_source, resolved_by_ai",
-      )
+      .select("user_id, status, resolution_source, resolved_by_ai")
       .eq("id", data.ticket_id)
       .single();
+    if (!t || t.user_id !== context.userId) throw new Error("Not your ticket.");
+    if (t.status !== "Resolved") throw new Error("Ticket is not resolved yet.");
 
-    if (!t || t.user_id !== context.userId) {
-      throw new Error("Not your ticket.");
-    }
-
-    if (t.status !== "Resolved") {
-      throw new Error("Ticket is not resolved yet.");
-    }
-
-    const { error } = await supabaseAdmin
-      .from("ticket_feedback")
-      .upsert(
-        {
-          ticket_id: data.ticket_id,
-          user_id: context.userId,
-          rating: data.rating,
-          comment: data.comment ?? null,
-          resolution_source:
-            t.resolution_source ??
-            (t.resolved_by_ai ? "ai" : "department"),
-        },
-        { onConflict: "ticket_id" },
-      );
-
+    const { error } = await supabaseAdmin.from("ticket_feedback").upsert(
+      {
+        ticket_id: data.ticket_id,
+        user_id: context.userId,
+        rating: data.rating,
+        comment: data.comment ?? null,
+        resolution_source: t.resolution_source ?? (t.resolved_by_ai ? "ai" : "department"),
+      },
+      { onConflict: "ticket_id" },
+    );
     if (error) throw new Error(error.message);
-
     return { ok: true };
   });
 
-// ----------------------------- AI Response Generator -----------------------------
+// ----------------------------- AI Response Generator (controlled) -----------------------------
 
 const ALLOWED_TOPIC_REFUSAL =
   "This platform only supports HR, IT, Finance, and Operations related requests.";
 
 const DEPT_BEHAVIOR: Record<Department, string> = {
-  IT: "You are IT Support. You MAY troubleshoot, suggest fixes, and attempt resolution.",
+  IT: "You are IT Support. You MAY troubleshoot, suggest fixes, and attempt resolution (VPN, passwords, network, devices, software). Provide concrete technical steps the user can try.",
   Operations:
-    "You are Operations. You MAY suggest operational procedures and workflow steps.",
-  HR: "You are HR. You MUST NOT give legal advice or make HR decisions.",
+    "You are Operations. You MAY suggest operational procedures and workflow steps. Keep guidance practical and limited to operational coordination.",
+  HR: "You are People & Culture. You MUST NOT give legal advice, make HR decisions, handle disciplinary actions, or investigate harassment claims. Acknowledge respectfully, show empathy, confirm the ticket was created, and indicate it has been securely escalated to the HR team.",
   Finance:
-    "You are Finance. You MUST NOT give tax advice or salary decisions.",
+    "You are Finance. You MUST NOT give tax advice, make salary decisions, or resolve payroll disputes. Acknowledge the request formally, confirm ticket creation, and indicate it has been escalated to the Finance team.",
 };
 
-export function autoTone(
-  categories: string[],
-  priority: string,
-  text: string,
-): Tone {
+export function autoTone(categories: string[], priority: string, text: string): Tone {
   const t = text.toLowerCase();
-
-  if (
-    categories.includes("HR") ||
-    /(harass|discriminat|sensitive|complaint)/.test(t)
-  ) {
-    return "empathetic";
-  }
-
-  if (
-    priority === "High" ||
-    /(outage|down|critical|asap|urgent|emergency)/.test(t)
-  ) {
-    return "urgent";
-  }
-
-  if (
-    categories.includes("Finance") ||
-    /(payroll|salary|invoice|tax)/.test(t)
-  ) {
-    return "formal";
-  }
-
+  if (categories.includes("HR") || /(harass|discriminat|sensitive|complaint)/.test(t)) return "empathetic";
+  if (priority === "High" || /(outage|down|critical|asap|urgent|emergency)/.test(t)) return "urgent";
+  if (categories.includes("Finance") || /(payroll|salary|invoice|tax)/.test(t)) return "formal";
   return "friendly";
 }
 
@@ -623,7 +393,6 @@ function templateResponse(input: {
   tone: Tone;
 }) {
   const list = input.categories.join(" & ");
-
   const opener =
     input.tone === "friendly"
       ? `Hi ${input.user_name}, thanks for reaching out!`
@@ -632,14 +401,9 @@ function templateResponse(input: {
         : input.tone === "empathetic"
           ? `Hi ${input.user_name}, we understand this may be a sensitive matter.`
           : `Dear ${input.user_name},`;
-
   const body = `We've received your request regarding "${input.title}" and routed it to the ${list} team${input.categories.length > 1 ? "s" : ""}. A team member will follow up shortly.`;
-
   const closing =
-    input.tone === "formal"
-      ? `\n\nKind regards,\nThe ${list} Team`
-      : `\n\nThanks,\nOpsAssist`;
-
+    input.tone === "formal" ? `\n\nKind regards,\nThe ${list} Team` : `\n\nThanks,\nOpsAssist`;
   return `${opener}\n\n${body}${closing}`;
 }
 
@@ -653,24 +417,13 @@ const GenerateResponseSchema = z.object({
   tone: z.enum(TONES).optional(),
 });
 
-export const generateTicketResponse = createServerFn({
-  method: "POST",
-})
+export const generateTicketResponse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
-    GenerateResponseSchema.parse(input),
-  )
+  .inputValidator((input: unknown) => GenerateResponseSchema.parse(input))
   .handler(async ({ data }) => {
     const tone: Tone =
-      data.tone ??
-      autoTone(
-        data.categories,
-        data.priority,
-        `${data.title} ${data.details}`,
-      );
-
-    const apiKey = process.env.GOOGLE_API_KEY;
-
+      data.tone ?? autoTone(data.categories, data.priority, `${data.title} ${data.details}`);
+    const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       return {
         response: templateResponse({ ...data, tone }),
@@ -679,98 +432,38 @@ export const generateTicketResponse = createServerFn({
       };
     }
 
-    const behavior = data.categories
-      .map((c) => DEPT_BEHAVIOR[c])
-      .join(" ");
-
+    const behavior = data.categories.map((c) => DEPT_BEHAVIOR[c]).join(" ");
     const system = [
       `You are OpsAssist, an enterprise support assistant. You MAY ONLY discuss HR, IT, Finance, or Operations topics. If the user's request is not related to those four departments, reply EXACTLY: "${ALLOWED_TOPIC_REFUSAL}"`,
       "Be concise: 60–140 words.",
       "Tone: " + tone + ".",
       behavior,
-      "Always acknowledge, confirm the ticket exists in the system, and outline next steps. No markdown.",
+      "Always acknowledge, confirm the ticket exists in the system, and outline next steps. No markdown. Sign off as the team.",
     ].join(" ");
 
     try {
-      const prompt = `
-${system}
-
-User: ${data.user_name}
-Departments: ${data.categories.join(", ")}
-Priority: ${data.priority}
-
-Title:
-${data.title}
-
-Details:
-${data.details}
-
-Write the response now.
-`;
-
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: prompt }],
-              },
-            ],
-            generationConfig: {
-              temperature:
-                tone === "formal"
-                  ? 0.2
-                  : tone === "empathetic"
-                    ? 0.6
-                    : 0.5,
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: system },
+            {
+              role: "user",
+              content: `User: ${data.user_name}\nDepartments: ${data.categories.join(", ")}\nPriority: ${data.priority}\nTitle: ${data.title}\nDetails: ${data.details}\n\nWrite the reply now.`,
             },
-          }),
-        },
-      );
-
-      if (!res.ok) {
-        console.error(
-          "Gemini response error:",
-          await res.text(),
-        );
-
-        return {
-          response: templateResponse({ ...data, tone }),
-          source: "template" as const,
-          tone,
-        };
-      }
-
-      const json = await res.json();
-
-      const content =
-        json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-      if (!content) {
-        return {
-          response: templateResponse({ ...data, tone }),
-          source: "template" as const,
-          tone,
-        };
-      }
-
-      return {
-        response: content,
-        source: "ai" as const,
-        tone,
-      };
-    } catch (err) {
-      console.error("Gemini generation failed:", err);
-
-      return {
-        response: templateResponse({ ...data, tone }),
-        source: "template" as const,
-        tone,
-      };
+          ],
+        }),
+      });
+      if (!res.ok)
+        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const content = json.choices?.[0]?.message?.content?.trim();
+      if (!content)
+        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      return { response: content, source: "ai" as const, tone };
+    } catch {
+      return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
     }
   });
