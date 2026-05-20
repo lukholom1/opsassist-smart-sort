@@ -27,14 +27,19 @@ export const getMyContext = createServerFn({ method: "GET" })
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId);
+
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("*")
       .eq("id", context.userId)
       .maybeSingle();
+
     return {
       userId: context.userId,
-      role: (roles?.[0]?.role ?? "employee") as "admin" | "employee" | "it_personnel",
+      role: (roles?.[0]?.role ?? "employee") as
+        | "admin"
+        | "employee"
+        | "it_personnel",
       profile,
     };
   });
@@ -59,11 +64,13 @@ export const createPendingUser = createServerFn({ method: "POST" })
     const email = normalizeEmail(data.email);
 
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+
     if (existingUsers.users.some((u) => u.email === email)) {
       throw new Error("A user with that email already exists.");
     }
 
     const otp = generateOtp();
+
     const { error } = await supabaseAdmin
       .from("pending_activations")
       .upsert(
@@ -77,22 +84,27 @@ export const createPendingUser = createServerFn({ method: "POST" })
         },
         { onConflict: "email" },
       );
+
     if (error) throw new Error(error.message);
 
-    // Best-effort email; if it fails we still return the OTP so the admin can share it.
     const mail = await sendOtpEmail({
-  email: data.email,
-  otp,
-  fullName: data.full_name,
-});
+      to: email,
+      fullName: data.full_name,
+      otp,
+      role: data.role,
+      department: data.department ?? null,
+    });
 
-if (!mail.sent) {
-  throw new Error(mail.error ?? "Failed to send OTP email");
-}
-
-return {
-  ok: true,
-};
+    return {
+      email,
+      otp,
+      full_name: data.full_name,
+      role: data.role,
+      department: data.department ?? null,
+      email_sent: mail.sent,
+      email_error: mail.error ?? null,
+    };
+  });
 
 // ---- Admin: list users ----
 export const listUsers = createServerFn({ method: "GET" })
@@ -102,15 +114,24 @@ export const listUsers = createServerFn({ method: "GET" })
       .from("profiles")
       .select("*")
       .order("created_at", { ascending: false });
-    const { data: roles } = await supabaseAdmin.from("user_roles").select("user_id, role");
+
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, role");
+
     const { data: pending } = await supabaseAdmin
       .from("pending_activations")
       .select("*")
       .is("used_at", null)
       .order("created_at", { ascending: false });
+
     const roleByUser = new Map((roles ?? []).map((r) => [r.user_id, r.role]));
+
     return {
-      users: (profiles ?? []).map((p) => ({ ...p, role: roleByUser.get(p.id) ?? "employee" })),
+      users: (profiles ?? []).map((p) => ({
+        ...p,
+        role: roleByUser.get(p.id) ?? "employee",
+      })),
       pending: pending ?? [],
     };
   });
@@ -133,17 +154,26 @@ export const activateAccount = createServerFn({ method: "POST" })
       .eq("email", email)
       .is("used_at", null)
       .maybeSingle();
+
     if (fetchErr) throw new Error(fetchErr.message);
     if (!pending) throw new Error("No pending invitation for that email.");
-    if (pending.otp_code !== data.otp) throw new Error("Incorrect activation code.");
+    if (pending.otp_code !== data.otp) {
+      throw new Error("Incorrect activation code.");
+    }
 
-    const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password: data.password,
-      email_confirm: true,
-      user_metadata: { full_name: pending.full_name },
-    });
-    if (createErr || !created.user) throw new Error(createErr?.message ?? "Failed to create user.");
+    const { data: created, error: createErr } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: data.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: pending.full_name,
+        },
+      });
+
+    if (createErr || !created.user) {
+      throw new Error(createErr?.message ?? "Failed to create user.");
+    }
 
     const userId = created.user.id;
 
@@ -153,12 +183,21 @@ export const activateAccount = createServerFn({ method: "POST" })
       email,
       department: pending.department,
     });
-    await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: pending.role });
+
+    await supabaseAdmin.from("user_roles").insert({
+      user_id: userId,
+      role: pending.role,
+    });
 
     await supabaseAdmin
       .from("pending_activations")
-      .update({ used_at: new Date().toISOString() })
+      .update({
+        used_at: new Date().toISOString(),
+      })
       .eq("id", pending.id);
 
-    return { ok: true, email };
+    return {
+      ok: true,
+      email,
+    };
   });
