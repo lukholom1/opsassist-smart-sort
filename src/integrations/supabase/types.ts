@@ -71,14 +71,92 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_assignments: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          department: string
+          id: string
+          resolved_at: string | null
+          resolved_by_ai: boolean
+          status: string
+          ticket_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          department: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by_ai?: boolean
+          status?: string
+          ticket_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          department?: string
+          id?: string
+          resolved_at?: string | null
+          resolved_by_ai?: boolean
+          status?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_assignments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          rating: number
+          resolution_source: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          rating: number
+          resolution_source?: string | null
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          rating?: number
+          resolution_source?: string | null
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_feedback_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assigned_to: string | null
+          categories: string[]
           category: string
           created_at: string
           details: string
           id: string
           priority: string
+          resolution_source: string | null
           resolved_at: string | null
           resolved_by_ai: boolean
           status: string
@@ -88,11 +166,13 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          categories?: string[]
           category: string
           created_at?: string
           details: string
           id?: string
           priority: string
+          resolution_source?: string | null
           resolved_at?: string | null
           resolved_by_ai?: boolean
           status?: string
@@ -102,11 +182,13 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          categories?: string[]
           category?: string
           created_at?: string
           details?: string
           id?: string
           priority?: string
+          resolution_source?: string | null
           resolved_at?: string | null
           resolved_by_ai?: boolean
           status?: string
@@ -153,6 +235,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      user_department: { Args: { _uid: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "employee" | "it_personnel"
