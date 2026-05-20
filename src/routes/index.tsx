@@ -24,7 +24,6 @@ export const Route = createFileRoute("/")({
       .eq("user_id", userId);
     const role = roles?.[0]?.role;
     if (role === "admin") throw redirect({ to: "/admin" });
-    if (role === "it_personnel") throw redirect({ to: "/it" });
     throw redirect({ to: "/dashboard" });
   },
   component: Landing,
