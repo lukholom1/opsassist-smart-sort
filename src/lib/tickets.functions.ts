@@ -4,28 +4,34 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
 
-const CATEGORIES = ["HR", "IT", "Finance", "Operations"] as const;
+const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
 const PRIORITIES = ["High", "Medium", "Low"] as const;
 const STATUSES = ["Open", "In Progress", "Resolved"] as const;
-const TONES = ["formal", "friendly", "urgent"] as const;
+const TONES = ["formal", "friendly", "urgent", "empathetic"] as const;
 
-type Category = (typeof CATEGORIES)[number];
+type Department = (typeof DEPARTMENTS)[number];
 type Priority = (typeof PRIORITIES)[number];
 type Tone = (typeof TONES)[number];
 
-// ----------------------------- Classification -----------------------------
+// ----------------------------- Classification (multi-department) -----------------------------
 
-function heuristicClassify(title: string, details: string): { category: Category; priority: Priority } {
+function heuristicClassify(
+  title: string,
+  details: string,
+): { categories: Department[]; priority: Priority } {
   const text = `${title} ${details}`.toLowerCase();
-  let category: Category = "Operations";
-  if (/(payroll|salary|leave|hr|hiring|benefit|vacation|holiday)/.test(text)) category = "HR";
-  else if (/(laptop|wifi|vpn|server|password|login|software|computer|email|network|system|bug|outage)/.test(text)) category = "IT";
-  else if (/(invoice|payment|reimburs|finance|budget|expense|tax|refund)/.test(text)) category = "Finance";
+  const cats = new Set<Department>();
+  if (/(payroll|salary|leave|hr|hiring|benefit|vacation|holiday|harass|discriminat|onboard)/.test(text)) cats.add("HR");
+  if (/(laptop|wifi|wi-fi|vpn|server|password|login|software|computer|email|network|system|bug|outage|router|access point|printer)/.test(text)) cats.add("IT");
+  if (/(invoice|payment|reimburs|finance|budget|expense|tax|refund|salary|payroll)/.test(text)) cats.add("Finance");
+  if (/(facilit|office|ceiling|door|cleaning|supplies|building|maintenance|elevator|hvac|operations|logistics)/.test(text)) cats.add("Operations");
+  if (cats.size === 0) cats.add("Operations");
 
   let priority: Priority = "Medium";
   if (/(urgent|asap|immediately|critical|down|outage|cannot work|blocker|emergency)/.test(text)) priority = "High";
   else if (/(whenever|low priority|minor|nice to have|sometime)/.test(text)) priority = "Low";
-  return { category, priority };
+
+  return { categories: Array.from(cats), priority };
 }
 
 async function classifyWithAI(title: string, details: string) {
@@ -41,7 +47,7 @@ async function classifyWithAI(title: string, details: string) {
           {
             role: "system",
             content:
-              'Classify business support tickets. Respond ONLY with strict JSON like {"category":"HR|IT|Finance|Operations","priority":"High|Medium|Low"}.',
+              'Classify business support tickets. A ticket may affect MULTIPLE departments. Respond ONLY with strict JSON like {"categories":["HR"|"IT"|"Finance"|"Operations"],"priority":"High"|"Medium"|"Low"}. Use one or more categories.',
           },
           { role: "user", content: `Title: ${title}\nDetails: ${details}` },
         ],
@@ -52,40 +58,56 @@ async function classifyWithAI(title: string, details: string) {
     const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const parsed = JSON.parse(json.choices?.[0]?.message?.content ?? "{}");
     const fb = heuristicClassify(title, details);
+    const cats: Department[] = Array.isArray(parsed.categories)
+      ? parsed.categories.filter((c: unknown): c is Department =>
+          typeof c === "string" && (DEPARTMENTS as readonly string[]).includes(c),
+        )
+      : [];
     return {
-      category: (CATEGORIES.includes(parsed.category) ? parsed.category : fb.category) as Category,
-      priority: (PRIORITIES.includes(parsed.priority) ? parsed.priority : fb.priority) as Priority,
+      categories: cats.length ? cats : fb.categories,
+      priority: ((PRIORITIES as readonly string[]).includes(parsed.priority)
+        ? parsed.priority
+        : fb.priority) as Priority,
     };
   } catch {
     return heuristicClassify(title, details);
   }
 }
 
-// ----------------------------- Assignment (load balanced) -----------------------------
+// ----------------------------- Load-balanced assignment -----------------------------
 
-// Returns the IT personnel user_id with the fewest active (Open/In Progress) tickets, or null.
-async function pickLeastBusyItPersonnel(): Promise<string | null> {
-  const { data: roles } = await supabaseAdmin
+// Pick the department admin (admin + profiles.department=dept) with the fewest active assignments.
+async function pickLeastBusyAdminForDept(dept: Department): Promise<string | null> {
+  // Admins with this department.
+  const { data: profs } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("department", dept);
+  const profIds = (profs ?? []).map((p) => p.id);
+  if (profIds.length === 0) return null;
+
+  const { data: roleRows } = await supabaseAdmin
     .from("user_roles")
     .select("user_id")
-    .eq("role", "it_personnel");
-  const ids = (roles ?? []).map((r) => r.user_id);
-  if (ids.length === 0) return null;
+    .eq("role", "admin")
+    .in("user_id", profIds);
+  const adminIds = (roleRows ?? []).map((r) => r.user_id);
+  if (adminIds.length === 0) return null;
 
   const { data: active } = await supabaseAdmin
-    .from("tickets")
+    .from("ticket_assignments")
     .select("assigned_to")
     .in("status", ["Open", "In Progress"])
-    .in("assigned_to", ids);
+    .in("assigned_to", adminIds);
 
-  const counts = new Map(ids.map((id) => [id, 0] as [string, number]));
+  const counts = new Map(adminIds.map((id) => [id, 0] as [string, number]));
   for (const row of active ?? []) {
     if (row.assigned_to) counts.set(row.assigned_to, (counts.get(row.assigned_to) ?? 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => a[1] - b[1])[0][0];
 }
 
-// ----------------------------- Submit ticket (authenticated) -----------------------------
+// ----------------------------- Submit ticket -----------------------------
 
 const SubmitSchema = z.object({
   title: z.string().trim().min(3).max(200),
@@ -93,12 +115,10 @@ const SubmitSchema = z.object({
 });
 
 export const submitTicket = createServerFn({ method: "POST" })
-  .middleware([requireRole(["employee", "admin", "it_personnel"])])
+  .middleware([requireRole(["employee", "admin"])])
   .inputValidator((input: unknown) => SubmitSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { category, priority } = await classifyWithAI(data.title, data.details);
-    // Auto-assign IT tickets to least-busy IT personnel.
-    const assigned_to = category === "IT" ? await pickLeastBusyItPersonnel() : null;
+    const { categories, priority } = await classifyWithAI(data.title, data.details);
     const userName = context.profile?.full_name ?? "User";
 
     const { data: row, error } = await supabaseAdmin
@@ -108,28 +128,70 @@ export const submitTicket = createServerFn({ method: "POST" })
         user_name: userName,
         title: data.title,
         details: data.details,
-        category,
+        category: categories[0], // legacy single field
+        categories,
         priority,
-        assigned_to,
       })
-      .select("id, category, priority, status, assigned_to, created_at")
+      .select("id")
       .single();
     if (error) throw new Error(error.message);
-    return { id: row.id, category: row.category, priority: row.priority, assigned_to: row.assigned_to };
+
+    // Create per-department assignments with load balancing.
+    const rows = await Promise.all(
+      categories.map(async (dept) => ({
+        ticket_id: row.id,
+        department: dept,
+        assigned_to: await pickLeastBusyAdminForDept(dept),
+      })),
+    );
+    const { error: aerr } = await supabaseAdmin.from("ticket_assignments").insert(rows);
+    if (aerr) throw new Error(aerr.message);
+
+    return { id: row.id, categories, priority };
   });
 
-// ----------------------------- Listing -----------------------------
+// ----------------------------- Listings -----------------------------
 
-// Helper: enrich tickets with assignee profiles.
-async function enrich(rows: Array<{ assigned_to: string | null; user_id: string | null }>) {
-  const ids = Array.from(
-    new Set(
-      rows.flatMap((r) => [r.assigned_to, r.user_id]).filter((v): v is string => Boolean(v)),
-    ),
+async function fetchAssignmentsForTickets(ticketIds: string[]) {
+  if (ticketIds.length === 0) return new Map<string, Array<Record<string, unknown>>>();
+  const { data } = await supabaseAdmin
+    .from("ticket_assignments")
+    .select("*")
+    .in("ticket_id", ticketIds);
+  const byTicket = new Map<string, Array<Record<string, unknown>>>();
+  for (const a of data ?? []) {
+    const arr = byTicket.get(a.ticket_id) ?? [];
+    arr.push(a);
+    byTicket.set(a.ticket_id, arr);
+  }
+  // Enrich with assignee names
+  const assigneeIds = Array.from(
+    new Set((data ?? []).map((a) => a.assigned_to).filter((v): v is string => !!v)),
   );
-  if (ids.length === 0) return new Map<string, { id: string; full_name: string }>();
-  const { data } = await supabaseAdmin.from("profiles").select("id, full_name").in("id", ids);
-  return new Map((data ?? []).map((p) => [p.id, p]));
+  if (assigneeIds.length) {
+    const { data: profs } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", assigneeIds);
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
+    for (const arr of byTicket.values()) {
+      for (const a of arr) {
+        (a as { assignee_name?: string | null }).assignee_name = a.assigned_to
+          ? (nameById.get(a.assigned_to as string) ?? null)
+          : null;
+      }
+    }
+  }
+  return byTicket;
+}
+
+async function fetchFeedbackForTickets(ticketIds: string[]) {
+  if (ticketIds.length === 0) return new Map<string, { rating: number; comment: string | null }>();
+  const { data } = await supabaseAdmin
+    .from("ticket_feedback")
+    .select("ticket_id, rating, comment")
+    .in("ticket_id", ticketIds);
+  return new Map((data ?? []).map((f) => [f.ticket_id, { rating: f.rating, comment: f.comment }]));
 }
 
 // Caller's own tickets.
@@ -142,98 +204,87 @@ export const listMyTickets = createServerFn({ method: "GET" })
       .eq("user_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    const profiles = await enrich(data ?? []);
+    const ids = (data ?? []).map((t) => t.id);
+    const [assignments, feedback] = await Promise.all([
+      fetchAssignmentsForTickets(ids),
+      fetchFeedbackForTickets(ids),
+    ]);
     return {
       tickets: (data ?? []).map((t) => ({
         ...t,
-        assignee_name: t.assigned_to ? profiles.get(t.assigned_to)?.full_name ?? null : null,
+        assignments: assignments.get(t.id) ?? [],
+        feedback: feedback.get(t.id) ?? null,
       })),
     };
   });
 
-// Tickets assigned to caller (IT personnel).
-export const listAssignedTickets = createServerFn({ method: "GET" })
-  .middleware([requireRole(["it_personnel", "admin"])])
-  .handler(async ({ context }) => {
-    const { data, error } = await supabaseAdmin
-      .from("tickets")
-      .select("*")
-      .eq("assigned_to", context.userId)
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    const profiles = await enrich(data ?? []);
-    return {
-      tickets: (data ?? []).map((t) => ({
-        ...t,
-        requester_name: t.user_id ? profiles.get(t.user_id)?.full_name ?? t.user_name : t.user_name,
-      })),
-    };
-  });
-
-// All tickets (admin).
-export const listAllTickets = createServerFn({ method: "GET" })
+// Department-scoped tickets for Department Admins (and all for Super Admins).
+export const listDeptTickets = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
-  .handler(async () => {
-    const { data, error } = await supabaseAdmin
+  .handler(async ({ context }) => {
+    const dept = context.department as Department | null;
+    let q = supabaseAdmin
       .from("tickets")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000);
+    if (dept) {
+      // department admin: only tickets that include their department
+      q = q.contains("categories", [dept]);
+    }
+    const { data, error } = await q;
     if (error) throw new Error(error.message);
-    const profiles = await enrich(data ?? []);
+    const ids = (data ?? []).map((t) => t.id);
+    const [assignments, feedback] = await Promise.all([
+      fetchAssignmentsForTickets(ids),
+      fetchFeedbackForTickets(ids),
+    ]);
     return {
+      isSuperAdmin: dept === null,
+      department: dept,
       tickets: (data ?? []).map((t) => ({
         ...t,
-        assignee_name: t.assigned_to ? profiles.get(t.assigned_to)?.full_name ?? null : null,
+        assignments: assignments.get(t.id) ?? [],
+        feedback: feedback.get(t.id) ?? null,
+        // Per-department status visible to this admin
+        my_assignment:
+          (assignments.get(t.id) ?? []).find((a) => !dept || a.department === dept) ?? null,
       })),
     };
   });
 
-// ----------------------------- Status updates -----------------------------
+// ----------------------------- Updates -----------------------------
 
-const UpdateStatusSchema = z.object({
-  id: z.string().uuid(),
+const UpdateAssignmentSchema = z.object({
+  assignment_id: z.string().uuid(),
   status: z.enum(STATUSES),
 });
 
-export const updateTicketStatus = createServerFn({ method: "POST" })
-  .middleware([requireRole(["admin", "it_personnel"])])
-  .inputValidator((input: unknown) => UpdateStatusSchema.parse(input))
+export const updateAssignmentStatus = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => UpdateAssignmentSchema.parse(input))
   .handler(async ({ data, context }) => {
-    // IT personnel may only update their own assigned tickets.
-    if (context.role === "it_personnel") {
-      const { data: t } = await supabaseAdmin
-        .from("tickets")
-        .select("assigned_to")
-        .eq("id", data.id)
+    const dept = context.department as Department | null;
+    // Department admin may only touch own department assignments.
+    if (dept) {
+      const { data: row } = await supabaseAdmin
+        .from("ticket_assignments")
+        .select("department")
+        .eq("id", data.assignment_id)
         .single();
-      if (t?.assigned_to !== context.userId) throw new Error("Not your ticket.");
+      if (row?.department !== dept) throw new Error("Not in your department.");
     }
     const patch: { status: typeof data.status; resolved_at?: string } = { status: data.status };
     if (data.status === "Resolved") patch.resolved_at = new Date().toISOString();
-    const { error } = await supabaseAdmin.from("tickets").update(patch).eq("id", data.id);
-    if (error) throw new Error(error.message);
-    return { id: data.id, status: data.status };
-  });
-
-// Assign / reassign a ticket (admin only).
-const AssignSchema = z.object({
-  id: z.string().uuid(),
-  assigned_to: z.string().uuid().nullable(),
-});
-export const assignTicket = createServerFn({ method: "POST" })
-  .middleware([requireRole(["admin"])])
-  .inputValidator((input: unknown) => AssignSchema.parse(input))
-  .handler(async ({ data }) => {
     const { error } = await supabaseAdmin
-      .from("tickets")
-      .update({ assigned_to: data.assigned_to })
-      .eq("id", data.id);
+      .from("ticket_assignments")
+      .update(patch)
+      .eq("id", data.assignment_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-// User marks their own ticket as resolved by AI.
+// User marks their ticket resolved by AI.
 const ResolveByAiSchema = z.object({ id: z.string().uuid() });
 export const markResolvedByAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -245,62 +296,104 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (t?.user_id !== context.userId) throw new Error("Not your ticket.");
-    const { error } = await supabaseAdmin
-      .from("tickets")
+    // Resolve every assignment — trigger will then resolve the parent.
+    const { error: aerr } = await supabaseAdmin
+      .from("ticket_assignments")
       .update({
         status: "Resolved",
         resolved_at: new Date().toISOString(),
         resolved_by_ai: true,
       })
+      .eq("ticket_id", data.id)
+      .neq("status", "Resolved");
+    if (aerr) throw new Error(aerr.message);
+    // Also stamp the parent directly (trigger may not fire if there were 0 assignments).
+    await supabaseAdmin
+      .from("tickets")
+      .update({
+        status: "Resolved",
+        resolved_at: new Date().toISOString(),
+        resolved_by_ai: true,
+        resolution_source: "ai",
+      })
       .eq("id", data.id);
+    return { ok: true };
+  });
+
+// ----------------------------- Feedback -----------------------------
+
+const FeedbackSchema = z.object({
+  ticket_id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().max(1000).optional(),
+});
+
+export const submitFeedback = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => FeedbackSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: t } = await supabaseAdmin
+      .from("tickets")
+      .select("user_id, status, resolution_source, resolved_by_ai")
+      .eq("id", data.ticket_id)
+      .single();
+    if (!t || t.user_id !== context.userId) throw new Error("Not your ticket.");
+    if (t.status !== "Resolved") throw new Error("Ticket is not resolved yet.");
+
+    const { error } = await supabaseAdmin.from("ticket_feedback").upsert(
+      {
+        ticket_id: data.ticket_id,
+        user_id: context.userId,
+        rating: data.rating,
+        comment: data.comment ?? null,
+        resolution_source: t.resolution_source ?? (t.resolved_by_ai ? "ai" : "department"),
+      },
+      { onConflict: "ticket_id" },
+    );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-// ----------------------------- AI Response Generator -----------------------------
+// ----------------------------- AI Response Generator (controlled) -----------------------------
 
-const CATEGORY_GUIDANCE: Record<string, string> = {
-  IT: "You represent IT Support. Reference triage and resolution windows.",
-  HR: "You represent People & Culture. Be empathetic and confidential.",
-  Finance: "You represent Finance. Be precise about amounts and approvals.",
-  Operations: "You represent Operations. Focus on coordination and timelines.",
-};
-const TONE_GUIDANCE: Record<Tone, string> = {
-  formal: "Professional, business-formal. No contractions. Courteous closing.",
-  friendly: "Warm, conversational, reassuring. Light contractions.",
-  urgent: "Direct, action-oriented. Acknowledge urgency. Short sentences.",
+const ALLOWED_TOPIC_REFUSAL =
+  "This platform only supports HR, IT, Finance, and Operations related requests.";
+
+const DEPT_BEHAVIOR: Record<Department, string> = {
+  IT: "You are IT Support. You MAY troubleshoot, suggest fixes, and attempt resolution (VPN, passwords, network, devices, software). Provide concrete technical steps the user can try.",
+  Operations:
+    "You are Operations. You MAY suggest operational procedures and workflow steps. Keep guidance practical and limited to operational coordination.",
+  HR: "You are People & Culture. You MUST NOT give legal advice, make HR decisions, handle disciplinary actions, or investigate harassment claims. Acknowledge respectfully, show empathy, confirm the ticket was created, and indicate it has been securely escalated to the HR team.",
+  Finance:
+    "You are Finance. You MUST NOT give tax advice, make salary decisions, or resolve payroll disputes. Acknowledge the request formally, confirm ticket creation, and indicate it has been escalated to the Finance team.",
 };
 
-// Auto-pick a tone based on priority + category + keywords.
-export function autoTone(category: string, priority: string, text: string): Tone {
+export function autoTone(categories: string[], priority: string, text: string): Tone {
   const t = text.toLowerCase();
+  if (categories.includes("HR") || /(harass|discriminat|sensitive|complaint)/.test(t)) return "empathetic";
   if (priority === "High" || /(outage|down|critical|asap|urgent|emergency)/.test(t)) return "urgent";
-  if (category === "HR" || category === "Finance" || /(payroll|salary|invoice|tax)/.test(t)) return "formal";
+  if (categories.includes("Finance") || /(payroll|salary|invoice|tax)/.test(t)) return "formal";
   return "friendly";
 }
 
-function templateResponse(input: { user_name: string; title: string; category: string; tone: Tone }) {
-  const team =
-    input.category === "IT"
-      ? "IT Support"
-      : input.category === "HR"
-        ? "People & Culture"
-        : input.category === "Finance"
-          ? "Finance"
-          : "Operations";
+function templateResponse(input: {
+  user_name: string;
+  title: string;
+  categories: string[];
+  tone: Tone;
+}) {
+  const list = input.categories.join(" & ");
   const opener =
     input.tone === "friendly"
       ? `Hi ${input.user_name}, thanks for reaching out!`
       : input.tone === "urgent"
-        ? `Hello ${input.user_name}, we've flagged your request as urgent and are acting on it now.`
-        : `Dear ${input.user_name},\n\nThank you for contacting the ${team} team.`;
-  const body = `We've received your request regarding "${input.title}" and routed it to ${team}. A team member will follow up shortly.`;
+        ? `Hello ${input.user_name}, we've flagged this as urgent and are acting now.`
+        : input.tone === "empathetic"
+          ? `Hi ${input.user_name}, we understand this may be a sensitive matter.`
+          : `Dear ${input.user_name},`;
+  const body = `We've received your request regarding "${input.title}" and routed it to the ${list} team${input.categories.length > 1 ? "s" : ""}. A team member will follow up shortly.`;
   const closing =
-    input.tone === "formal"
-      ? `\n\nKind regards,\nThe ${team} Team`
-      : input.tone === "urgent"
-        ? `\n\nExpect an update within the hour.\n— ${team}`
-        : `\n\nTalk soon,\nThe ${team} Team`;
+    input.tone === "formal" ? `\n\nKind regards,\nThe ${list} Team` : `\n\nThanks,\nOpsAssist`;
   return `${opener}\n\n${body}${closing}`;
 }
 
@@ -309,26 +402,35 @@ const GenerateResponseSchema = z.object({
   user_name: z.string().trim().min(1).max(100),
   title: z.string().trim().min(1).max(200),
   details: z.string().trim().min(1).max(2000),
-  category: z.string().trim().min(1).max(50),
+  categories: z.array(z.enum(DEPARTMENTS)).min(1).max(4),
   priority: z.string().trim().min(1).max(20),
-  tone: z.enum(TONES).optional(), // if omitted, auto-pick
+  tone: z.enum(TONES).optional(),
 });
 
 export const generateTicketResponse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => GenerateResponseSchema.parse(input))
   .handler(async ({ data }) => {
-    const tone: Tone = data.tone ?? autoTone(data.category, data.priority, `${data.title} ${data.details}`);
+    const tone: Tone =
+      data.tone ?? autoTone(data.categories, data.priority, `${data.title} ${data.details}`);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
-      return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      return {
+        response: templateResponse({ ...data, tone }),
+        source: "template" as const,
+        tone,
+      };
     }
+
+    const behavior = data.categories.map((c) => DEPT_BEHAVIOR[c]).join(" ");
     const system = [
-      "You are an AI assistant writing a reply from a support team to an employee who submitted a ticket.",
-      CATEGORY_GUIDANCE[data.category] ?? `You represent the ${data.category} team.`,
-      TONE_GUIDANCE[tone],
-      "Keep the reply 60-140 words. Address the user by first name. Acknowledge, confirm routing, outline next steps. No markdown. Sign off as the team.",
+      `You are OpsAssist, an enterprise support assistant. You MAY ONLY discuss HR, IT, Finance, or Operations topics. If the user's request is not related to those four departments, reply EXACTLY: "${ALLOWED_TOPIC_REFUSAL}"`,
+      "Be concise: 60–140 words.",
+      "Tone: " + tone + ".",
+      behavior,
+      "Always acknowledge, confirm the ticket exists in the system, and outline next steps. No markdown. Sign off as the team.",
     ].join(" ");
+
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -339,15 +441,17 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
             { role: "system", content: system },
             {
               role: "user",
-              content: `User: ${data.user_name}\nCategory: ${data.category}\nPriority: ${data.priority}\nTitle: ${data.title}\nDetails: ${data.details}\n\nWrite the reply now.`,
+              content: `User: ${data.user_name}\nDepartments: ${data.categories.join(", ")}\nPriority: ${data.priority}\nTitle: ${data.title}\nDetails: ${data.details}\n\nWrite the reply now.`,
             },
           ],
         }),
       });
-      if (!res.ok) return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      if (!res.ok)
+        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
       const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = json.choices?.[0]?.message?.content?.trim();
-      if (!content) return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      if (!content)
+        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
       return { response: content, source: "ai" as const, tone };
     } catch {
       return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
