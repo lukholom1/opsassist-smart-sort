@@ -152,21 +152,33 @@ export const submitTicket = createServerFn({ method: "POST" })
 
 // ----------------------------- Listings -----------------------------
 
+export type AssignmentRow = {
+  id: string;
+  ticket_id: string;
+  department: string;
+  assigned_to: string | null;
+  status: string;
+  resolved_at: string | null;
+  resolved_by_ai: boolean;
+  created_at: string;
+  assignee_name?: string | null;
+};
+
 async function fetchAssignmentsForTickets(ticketIds: string[]) {
-  if (ticketIds.length === 0) return new Map<string, Array<Record<string, unknown>>>();
+  const byTicket = new Map<string, AssignmentRow[]>();
+  if (ticketIds.length === 0) return byTicket;
   const { data } = await supabaseAdmin
     .from("ticket_assignments")
     .select("*")
     .in("ticket_id", ticketIds);
-  const byTicket = new Map<string, Array<Record<string, unknown>>>();
-  for (const a of data ?? []) {
+  const rows = (data ?? []) as AssignmentRow[];
+  for (const a of rows) {
     const arr = byTicket.get(a.ticket_id) ?? [];
     arr.push(a);
     byTicket.set(a.ticket_id, arr);
   }
-  // Enrich with assignee names
   const assigneeIds = Array.from(
-    new Set((data ?? []).map((a) => a.assigned_to).filter((v): v is string => !!v)),
+    new Set(rows.map((a) => a.assigned_to).filter((v): v is string => !!v)),
   );
   if (assigneeIds.length) {
     const { data: profs } = await supabaseAdmin
@@ -176,9 +188,7 @@ async function fetchAssignmentsForTickets(ticketIds: string[]) {
     const nameById = new Map((profs ?? []).map((p) => [p.id, p.full_name]));
     for (const arr of byTicket.values()) {
       for (const a of arr) {
-        (a as { assignee_name?: string | null }).assignee_name = a.assigned_to
-          ? (nameById.get(a.assigned_to as string) ?? null)
-          : null;
+        a.assignee_name = a.assigned_to ? (nameById.get(a.assigned_to) ?? null) : null;
       }
     }
   }
