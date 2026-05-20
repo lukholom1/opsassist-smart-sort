@@ -3,7 +3,7 @@
 
 const RESEND_URL = "https://api.resend.com/emails";
 // Resend's onboarding sender works without a verified domain — fine for OTP demos.
-const FROM = "OpsAssist <onboarding@resend.dev>";
+const FROM = "OpsAssist <noreply@resend.dev>";
 
 export async function sendOtpEmail(opts: {
   to: string;

@@ -81,23 +81,18 @@ export const createPendingUser = createServerFn({ method: "POST" })
 
     // Best-effort email; if it fails we still return the OTP so the admin can share it.
     const mail = await sendOtpEmail({
-      to: email,
-      fullName: data.full_name,
-      otp,
-      role: data.role,
-      department: data.department ?? null,
-    });
+  email: data.email,
+  otp,
+  fullName: data.full_name,
+});
 
-    return {
-      email,
-      otp,
-      full_name: data.full_name,
-      role: data.role,
-      department: data.department ?? null,
-      email_sent: mail.sent,
-      email_error: mail.error ?? null,
-    };
-  });
+if (!mail.sent) {
+  throw new Error(mail.error ?? "Failed to send OTP email");
+}
+
+return {
+  ok: true,
+};
 
 // ---- Admin: list users ----
 export const listUsers = createServerFn({ method: "GET" })
