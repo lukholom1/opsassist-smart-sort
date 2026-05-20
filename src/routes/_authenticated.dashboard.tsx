@@ -6,6 +6,8 @@ import {
   listMyTickets,
   generateTicketResponse,
   markResolvedByAI,
+  submitFeedback,
+  type AssignmentRow,
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
@@ -22,7 +24,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot } from "lucide-react";
-import { elapsed, CategoryPill, PriorityPill, StatusPill } from "@/components/ticket-bits";
+import {
+  elapsed,
+  CategoryPills,
+  PriorityPill,
+  StatusPill,
+  DepartmentStatusPills,
+  RatingStars,
+} from "@/components/ticket-bits";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
@@ -33,13 +42,14 @@ type Ticket = {
   id: string;
   title: string;
   details: string;
-  category: string;
+  categories: string[];
   priority: string;
   status: "Open" | "In Progress" | "Resolved";
   created_at: string;
   resolved_at: string | null;
   resolved_by_ai: boolean;
-  assignee_name?: string | null;
+  assignments: AssignmentRow[];
+  feedback: { rating: number; comment: string | null } | null;
 };
 
 function DashboardPage() {
@@ -50,10 +60,11 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [aiTicket, setAiTicket] = useState<Ticket | null>(null);
+  const [rateTicket, setRateTicket] = useState<Ticket | null>(null);
 
   async function refresh() {
-    const r = await fetchMine();
-    setTickets(r.tickets as Ticket[]);
+    const r = (await fetchMine()) as { tickets: Ticket[] };
+    setTickets(r.tickets);
   }
 
   useEffect(() => {
@@ -86,7 +97,7 @@ function DashboardPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
             <p className="text-sm text-muted-foreground">
-              Submit a new request and track its progress in real time.
+              Submit a new request and track its progress per department.
             </p>
           </div>
           <Button
@@ -124,25 +135,44 @@ function DashboardPage() {
                     </div>
                     <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.details}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      <CategoryPill value={t.category} />
+                      <CategoryPills values={t.categories} />
                       <PriorityPill value={t.priority} />
                       <StatusPill value={t.status} />
-                      <span className="text-muted-foreground">
-                        {t.assignee_name ? `· Assigned to ${t.assignee_name}` : ""}
-                      </span>
                       <span className="text-muted-foreground">· {elapsed(t.created_at, t.resolved_at)}</span>
                     </div>
+                    {t.assignments.length > 0 && (
+                      <div className="mt-2">
+                        <DepartmentStatusPills assignments={t.assignments} />
+                      </div>
+                    )}
+                    {t.feedback && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Your rating:</span>
+                        <RatingStars value={t.feedback.rating} size={12} />
+                      </div>
+                    )}
                   </div>
-                  {t.status !== "Resolved" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAiTicket(t)}
-                      className="rounded-full"
-                    >
-                      <Sparkles size={14} className="mr-1.5 text-purple-accent" /> AI support
-                    </Button>
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {t.status !== "Resolved" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAiTicket(t)}
+                        className="rounded-full"
+                      >
+                        <Sparkles size={14} className="mr-1.5 text-purple-accent" /> AI support
+                      </Button>
+                    )}
+                    {t.status === "Resolved" && !t.feedback && (
+                      <Button
+                        size="sm"
+                        onClick={() => setRateTicket(t)}
+                        className="rounded-full bg-warning text-warning-foreground hover:bg-warning/90"
+                      >
+                        Rate experience
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -154,10 +184,14 @@ function DashboardPage() {
       {showForm && (
         <NewTicketDialog
           onClose={() => setShowForm(false)}
-          onCreated={(t) => {
+          onCreated={async () => {
             setShowForm(false);
-            setAiTicket(t);
-            refresh();
+            await refresh();
+            // Open AI dialog for the newest ticket
+            const r = (await new Promise<{ tickets: Ticket[] }>((res) =>
+              fetchMine().then((x) => res(x as { tickets: Ticket[] })),
+            ));
+            if (r.tickets[0]) setAiTicket(r.tickets[0]);
           }}
         />
       )}
@@ -171,17 +205,27 @@ function DashboardPage() {
           }}
         />
       )}
+      {rateTicket && (
+        <RatingDialog
+          ticket={rateTicket}
+          onClose={() => setRateTicket(null)}
+          onSubmitted={() => {
+            setRateTicket(null);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ----- New Ticket dialog: always creates the ticket BEFORE AI interaction -----
+// ----- New Ticket dialog -----
 function NewTicketDialog({
   onClose,
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (t: Ticket) => void;
+  onCreated: () => void;
 }) {
   const submit = useServerFn(submitTicket);
   const [title, setTitle] = useState("");
@@ -194,18 +238,8 @@ function NewTicketDialog({
     setLoading(true);
     setError(null);
     try {
-      const res = await submit({ data: { title, details } });
-      onCreated({
-        id: res.id,
-        title,
-        details,
-        category: res.category,
-        priority: res.priority,
-        status: "Open",
-        created_at: new Date().toISOString(),
-        resolved_at: null,
-        resolved_by_ai: false,
-      });
+      await submit({ data: { title, details } });
+      onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit");
     } finally {
@@ -219,7 +253,7 @@ function NewTicketDialog({
         <DialogHeader>
           <DialogTitle>Submit a new ticket</DialogTitle>
           <DialogDescription>
-            AI will classify your ticket, assign it, and offer a support response.
+            AI will classify your ticket across HR, IT, Finance and Operations, route it, and offer a response.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="grid gap-4">
@@ -261,7 +295,7 @@ function NewTicketDialog({
   );
 }
 
-// ----- AI support dialog: shows generated response and "Issue Resolved" / forward CTA -----
+// ----- AI support dialog -----
 function AiSupportDialog({
   ticket,
   onClose,
@@ -284,15 +318,13 @@ function AiSupportDialog({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setText("");
-    setSource(null);
     generate({
       data: {
         ticket_id: ticket.id,
         user_name: fullName ?? "there",
         title: ticket.title,
         details: ticket.details,
-        category: ticket.category,
+        categories: ticket.categories as ("HR" | "IT" | "Finance" | "Operations")[],
         priority: ticket.priority,
       },
     })
@@ -306,7 +338,7 @@ function AiSupportDialog({
     return () => {
       cancelled = true;
     };
-  }, [ticket.id, ticket.title, ticket.details, ticket.category, ticket.priority, fullName, generate]);
+  }, [ticket.id, ticket.title, ticket.details, ticket.priority, fullName, generate, ticket.categories]);
 
   async function handleResolved() {
     setResolving(true);
@@ -326,12 +358,12 @@ function AiSupportDialog({
             <Sparkles size={16} className="text-purple-accent" /> AI support
           </DialogTitle>
           <DialogDescription>
-            Reply tailored to your <span className="font-medium">{ticket.category}</span> ticket
+            Routed to <span className="font-medium">{ticket.categories.join(", ")}</span>
             {tone && <> · tone: <span className="font-medium">{tone}</span></>}
             {source === "template" && <> · template fallback</>}
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm whitespace-pre-wrap min-h-[160px]">
+        <div className="min-h-[160px] whitespace-pre-wrap rounded-xl border border-border bg-muted/30 p-4 text-sm">
           {loading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Generating response...
@@ -343,7 +375,7 @@ function AiSupportDialog({
 
         {forwarded ? (
           <div className="rounded-md bg-soft-blue/10 px-3 py-3 text-sm text-soft-blue">
-            Your ticket has been forwarded to the relevant department for review.
+            Your ticket has been forwarded to the relevant department(s) for review.
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -360,6 +392,75 @@ function AiSupportDialog({
             </Button>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ----- Rating dialog (shown when ticket fully resolved & not yet rated) -----
+function RatingDialog({
+  ticket,
+  onClose,
+  onSubmitted,
+}: {
+  ticket: Ticket;
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const submit = useServerFn(submitFeedback);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setErr(null);
+    try {
+      await submit({ data: { ticket_id: ticket.id, rating, comment: comment || undefined } });
+      onSubmitted();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rate your support experience</DialogTitle>
+          <DialogDescription>
+            “{ticket.title}” — {ticket.resolved_by_ai ? "Resolved by AI" : "Resolved by team"}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="grid gap-4">
+          <div className="flex justify-center py-2">
+            <RatingStars value={rating} onChange={setRating} size={32} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Optional comment</Label>
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              maxLength={1000}
+              placeholder="Anything else you'd like us to know?"
+            />
+          </div>
+          {err && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>
+          )}
+          <Button
+            type="submit"
+            disabled={loading}
+            className="h-11 rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
+          >
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Submit feedback
+          </Button>
+        </form>
       </DialogContent>
     </Dialog>
   );

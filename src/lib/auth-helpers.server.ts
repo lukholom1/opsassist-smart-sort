@@ -3,7 +3,8 @@ import { createMiddleware } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// Loads the caller's role and profile (from service-role client to bypass RLS recursion).
+// Loads the caller's role + profile (with `department`) using the service-role
+// client so RLS recursion isn't an issue.
 export const requireRole = (allowed: ("admin" | "employee" | "it_personnel")[]) =>
   createMiddleware({ type: "function" })
     .middleware([requireSupabaseAuth])
@@ -13,7 +14,11 @@ export const requireRole = (allowed: ("admin" | "employee" | "it_personnel")[]) 
         .select("role")
         .eq("user_id", context.userId);
 
-      const userRole = roles?.[0]?.role as "admin" | "employee" | "it_personnel" | undefined;
+      const userRole = roles?.[0]?.role as
+        | "admin"
+        | "employee"
+        | "it_personnel"
+        | undefined;
       if (!userRole || !allowed.includes(userRole)) {
         throw new Error("Forbidden: insufficient role");
       }
@@ -24,5 +29,12 @@ export const requireRole = (allowed: ("admin" | "employee" | "it_personnel")[]) 
         .eq("id", context.userId)
         .single();
 
-      return next({ context: { ...context, role: userRole, profile } });
+      return next({
+        context: {
+          ...context,
+          role: userRole,
+          profile,
+          department: (profile?.department ?? null) as string | null,
+        },
+      });
     });
