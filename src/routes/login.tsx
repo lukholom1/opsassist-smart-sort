@@ -116,7 +116,7 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
           className="h-11 rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-          Sign in
+          {isAdmin ? "Sign in" : "User sign in"}
         </Button>
       </form>
       <button

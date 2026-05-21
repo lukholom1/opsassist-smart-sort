@@ -167,3 +167,74 @@ export const activateAccount = createServerFn({ method: "POST" })
 
     return { ok: true, email };
   });
+
+// ---- Super admin: delete a user ----
+const requireSuperAdmin = requireRole(["admin"]);
+
+export const deleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSuperAdmin])
+  .inputValidator((input: unknown) => z.object({ user_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can delete users.");
+    }
+    if (data.user_id === context.userId) {
+      throw new Error("You cannot delete your own account.");
+    }
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    await supabaseAdmin.from("profiles").delete().eq("id", data.user_id);
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---- Super admin: cancel a pending activation ----
+export const deletePendingUser = createServerFn({ method: "POST" })
+  .middleware([requireSuperAdmin])
+  .inputValidator((input: unknown) => z.object({ email: z.string().min(3).max(120) }).parse(input))
+  .handler(async ({ data, context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can delete users.");
+    }
+    const email = normalizeEmail(data.email);
+    await supabaseAdmin.from("pending_activations").delete().eq("email", email);
+    return { ok: true };
+  });
+
+// ---- Super admin: reclassify a user (employee <-> department admin) ----
+const ReclassifySchema = z
+  .object({
+    user_id: z.string().uuid(),
+    role: z.enum(ROLES),
+    department: z.enum(DEPTS).nullable().optional(),
+  })
+  .refine((v) => v.role !== "admin" || !!v.department, {
+    message: "Department Admin requires a department.",
+    path: ["department"],
+  });
+
+export const reclassifyUser = createServerFn({ method: "POST" })
+  .middleware([requireSuperAdmin])
+  .inputValidator((input: unknown) => ReclassifySchema.parse(input))
+  .handler(async ({ data, context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can reclassify users.");
+    }
+    if (data.user_id === context.userId) {
+      throw new Error("You cannot change your own role.");
+    }
+    // Replace role
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.user_id);
+    const { error: rErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: data.user_id, role: data.role });
+    if (rErr) throw new Error(rErr.message);
+    // Update department on profile (employees get null)
+    const dept = data.role === "admin" ? data.department ?? null : null;
+    const { error: pErr } = await supabaseAdmin
+      .from("profiles")
+      .update({ department: dept })
+      .eq("id", data.user_id);
+    if (pErr) throw new Error(pErr.message);
+    return { ok: true };
+  });

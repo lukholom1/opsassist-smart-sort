@@ -2,7 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listDeptTickets, updateAssignmentStatus, type AssignmentRow } from "@/lib/tickets.functions";
-import { createPendingUser, listUsers } from "@/lib/users.functions";
+import {
+  createPendingUser,
+  deletePendingUser,
+  deleteUser,
+  listUsers,
+  reclassifyUser,
+} from "@/lib/users.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
@@ -23,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2 } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -383,8 +389,13 @@ function TicketTable({
 
 // ---- Users dialog (super admin only) ----
 function UsersDialog({ onClose }: { onClose: () => void }) {
+  const { session } = useAuth();
+  const myId = session?.user.id;
   const fetchUsers = useServerFn(listUsers);
   const createUser = useServerFn(createPendingUser);
+  const removeUser = useServerFn(deleteUser);
+  const removePending = useServerFn(deletePendingUser);
+  const reclassify = useServerFn(reclassifyUser);
   const [data, setData] = useState<{
     users: Array<{ id: string; full_name: string; email: string; role: string; department: string | null }>;
     pending: Array<{ email: string; full_name: string; role: string; otp_code: string; department: string | null }>;
@@ -448,6 +459,39 @@ function UsersDialog({ onClose }: { onClose: () => void }) {
     await navigator.clipboard.writeText(createdOtp.otp);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
+  }
+
+  async function onReclassify(
+    userId: string,
+    role: "employee" | "admin",
+    department: "HR" | "IT" | "Finance" | "Operations" | null,
+  ) {
+    try {
+      await reclassify({ data: { user_id: userId, role, department } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to reclassify user.");
+    }
+  }
+
+  async function onDelete(userId: string, label: string) {
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      await removeUser({ data: { user_id: userId } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete user.");
+    }
+  }
+
+  async function onCancelPending(email: string) {
+    if (!confirm(`Cancel pending invite for ${email}?`)) return;
+    try {
+      await removePending({ data: { email } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to cancel invite.");
+    }
   }
 
   return (
@@ -569,23 +613,98 @@ function UsersDialog({ onClose }: { onClose: () => void }) {
                   <th className="px-3 py-2 font-medium">Email</th>
                   <th className="px-3 py-2 font-medium">Role</th>
                   <th className="px-3 py-2 font-medium">Department</th>
+                  <th className="px-3 py-2 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {(data?.users ?? []).map((u) => (
-                  <tr key={u.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-3 py-2">{u.full_name}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
-                    <td className="px-3 py-2">{u.role}</td>
-                    <td className="px-3 py-2">{u.department ?? "—"}</td>
-                  </tr>
-                ))}
+                {(data?.users ?? []).map((u) => {
+                  const isSelf = u.id === myId;
+                  const isSuper = u.role === "admin" && !u.department;
+                  return (
+                    <tr key={u.id} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2">{u.full_name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
+                      <td className="px-3 py-2">
+                        {isSelf || isSuper ? (
+                          <span className="text-xs text-muted-foreground">
+                            {isSuper ? "super admin" : u.role}
+                          </span>
+                        ) : (
+                          <Select
+                            value={u.role === "admin" ? "admin" : "employee"}
+                            onValueChange={(v) =>
+                              onReclassify(
+                                u.id,
+                                v as "employee" | "admin",
+                                v === "admin" ? (u.department as "HR" | "IT" | "Finance" | "Operations" | null) ?? "IT" : null,
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[150px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="employee">Employee</SelectItem>
+                              <SelectItem value="admin">Department Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {u.role === "admin" && !isSuper && !isSelf ? (
+                          <Select
+                            value={u.department ?? "IT"}
+                            onValueChange={(v) =>
+                              onReclassify(u.id, "admin", v as "HR" | "IT" | "Finance" | "Operations")
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[120px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="IT">IT</SelectItem>
+                              <SelectItem value="Finance">Finance</SelectItem>
+                              <SelectItem value="Operations">Operations</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-muted-foreground">{u.department ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {!isSelf && !isSuper && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(u.id, u.full_name || u.email)}
+                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {(data?.pending ?? []).map((p) => (
                   <tr key={p.email} className="border-b border-border/60 bg-warning/5 last:border-0">
                     <td className="px-3 py-2">{p.full_name}</td>
                     <td className="px-3 py-2 text-muted-foreground">{p.email}</td>
                     <td className="px-3 py-2">{p.role} · pending</td>
                     <td className="px-3 py-2">{p.department ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCancelPending(p.email)}
+                        className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
