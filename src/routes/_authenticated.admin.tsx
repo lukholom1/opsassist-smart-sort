@@ -389,8 +389,13 @@ function TicketTable({
 
 // ---- Users dialog (super admin only) ----
 function UsersDialog({ onClose }: { onClose: () => void }) {
+  const { session } = useAuth();
+  const myId = session?.user.id;
   const fetchUsers = useServerFn(listUsers);
   const createUser = useServerFn(createPendingUser);
+  const removeUser = useServerFn(deleteUser);
+  const removePending = useServerFn(deletePendingUser);
+  const reclassify = useServerFn(reclassifyUser);
   const [data, setData] = useState<{
     users: Array<{ id: string; full_name: string; email: string; role: string; department: string | null }>;
     pending: Array<{ email: string; full_name: string; role: string; otp_code: string; department: string | null }>;
