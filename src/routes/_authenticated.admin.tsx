@@ -461,6 +461,39 @@ function UsersDialog({ onClose }: { onClose: () => void }) {
     setTimeout(() => setCopied(false), 1200);
   }
 
+  async function onReclassify(
+    userId: string,
+    role: "employee" | "admin",
+    department: "HR" | "IT" | "Finance" | "Operations" | null,
+  ) {
+    try {
+      await reclassify({ data: { user_id: userId, role, department } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to reclassify user.");
+    }
+  }
+
+  async function onDelete(userId: string, label: string) {
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+    try {
+      await removeUser({ data: { user_id: userId } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete user.");
+    }
+  }
+
+  async function onCancelPending(email: string) {
+    if (!confirm(`Cancel pending invite for ${email}?`)) return;
+    try {
+      await removePending({ data: { email } });
+      await refresh();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to cancel invite.");
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
