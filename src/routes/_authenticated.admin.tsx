@@ -2,7 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listDeptTickets, updateAssignmentStatus, type AssignmentRow } from "@/lib/tickets.functions";
-import { createPendingUser, listUsers } from "@/lib/users.functions";
+import {
+  createPendingUser,
+  deletePendingUser,
+  deleteUser,
+  listUsers,
+  reclassifyUser,
+} from "@/lib/users.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
@@ -23,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2 } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
