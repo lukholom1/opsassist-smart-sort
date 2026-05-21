@@ -613,23 +613,98 @@ function UsersDialog({ onClose }: { onClose: () => void }) {
                   <th className="px-3 py-2 font-medium">Email</th>
                   <th className="px-3 py-2 font-medium">Role</th>
                   <th className="px-3 py-2 font-medium">Department</th>
+                  <th className="px-3 py-2 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {(data?.users ?? []).map((u) => (
-                  <tr key={u.id} className="border-b border-border/60 last:border-0">
-                    <td className="px-3 py-2">{u.full_name}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
-                    <td className="px-3 py-2">{u.role}</td>
-                    <td className="px-3 py-2">{u.department ?? "—"}</td>
-                  </tr>
-                ))}
+                {(data?.users ?? []).map((u) => {
+                  const isSelf = u.id === myId;
+                  const isSuper = u.role === "admin" && !u.department;
+                  return (
+                    <tr key={u.id} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2">{u.full_name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{u.email}</td>
+                      <td className="px-3 py-2">
+                        {isSelf || isSuper ? (
+                          <span className="text-xs text-muted-foreground">
+                            {isSuper ? "super admin" : u.role}
+                          </span>
+                        ) : (
+                          <Select
+                            value={u.role === "admin" ? "admin" : "employee"}
+                            onValueChange={(v) =>
+                              onReclassify(
+                                u.id,
+                                v as "employee" | "admin",
+                                v === "admin" ? (u.department as "HR" | "IT" | "Finance" | "Operations" | null) ?? "IT" : null,
+                              )
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[150px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="employee">Employee</SelectItem>
+                              <SelectItem value="admin">Department Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {u.role === "admin" && !isSuper && !isSelf ? (
+                          <Select
+                            value={u.department ?? "IT"}
+                            onValueChange={(v) =>
+                              onReclassify(u.id, "admin", v as "HR" | "IT" | "Finance" | "Operations")
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[120px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HR">HR</SelectItem>
+                              <SelectItem value="IT">IT</SelectItem>
+                              <SelectItem value="Finance">Finance</SelectItem>
+                              <SelectItem value="Operations">Operations</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-muted-foreground">{u.department ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {!isSelf && !isSuper && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(u.id, u.full_name || u.email)}
+                            className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {(data?.pending ?? []).map((p) => (
                   <tr key={p.email} className="border-b border-border/60 bg-warning/5 last:border-0">
                     <td className="px-3 py-2">{p.full_name}</td>
                     <td className="px-3 py-2 text-muted-foreground">{p.email}</td>
                     <td className="px-3 py-2">{p.role} · pending</td>
                     <td className="px-3 py-2">{p.department ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onCancelPending(p.email)}
+                        className="h-8 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
