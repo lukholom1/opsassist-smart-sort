@@ -147,6 +147,44 @@ export type Database = {
           },
         ]
       }
+      ticket_notes: {
+        Row: {
+          author_id: string
+          author_name: string
+          author_role: string
+          body: string
+          created_at: string
+          id: string
+          ticket_id: string
+        }
+        Insert: {
+          author_id: string
+          author_name: string
+          author_role: string
+          body: string
+          created_at?: string
+          id?: string
+          ticket_id: string
+        }
+        Update: {
+          author_id?: string
+          author_name?: string
+          author_role?: string
+          body?: string
+          created_at?: string
+          id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_notes_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
           assigned_to: string | null
@@ -224,6 +262,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_ticket_notes: {
+        Args: { _ticket_id: string }
+        Returns: boolean
+      }
       get_my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
