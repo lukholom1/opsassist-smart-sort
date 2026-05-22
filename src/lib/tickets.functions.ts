@@ -467,3 +467,99 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
       return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
     }
   });
+
+// ----------------------------- Ticket conversation notes -----------------------------
+
+export type TicketNote = {
+  id: string;
+  ticket_id: string;
+  author_id: string;
+  author_name: string;
+  author_role: "user" | "admin";
+  body: string;
+  created_at: string;
+};
+
+async function loadTicketForNotes(ticketId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("tickets")
+    .select("id, user_id, status, categories")
+    .eq("id", ticketId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Ticket not found.");
+  return data as { id: string; user_id: string; status: string; categories: string[] };
+}
+
+async function assertNoteAccess(
+  ticketId: string,
+  userId: string,
+): Promise<{ ticket: Awaited<ReturnType<typeof loadTicketForNotes>>; role: "user" | "admin"; name: string }> {
+  const ticket = await loadTicketForNotes(ticketId);
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name, department")
+    .eq("id", userId)
+    .maybeSingle();
+  const { data: roleRow } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const isAdmin = roleRow?.role === "admin";
+  const dept = profile?.department ?? null;
+  const isSuper = isAdmin && dept === null;
+  const isDeptAdmin = isAdmin && dept !== null && ticket.categories.includes(dept);
+  const isOwner = ticket.user_id === userId;
+  if (!isOwner && !isSuper && !isDeptAdmin) {
+    throw new Error("You can't access this conversation.");
+  }
+  return {
+    ticket,
+    role: isOwner ? "user" : "admin",
+    name: profile?.full_name ?? "Unknown",
+  };
+}
+
+export const listTicketNotes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ ticket_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }): Promise<{ notes: TicketNote[]; locked: boolean }> => {
+    const { ticket } = await assertNoteAccess(data.ticket_id, context.userId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("ticket_notes")
+      .select("*")
+      .eq("ticket_id", data.ticket_id)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return { notes: (rows ?? []) as TicketNote[], locked: ticket.status === "Resolved" };
+  });
+
+const AddNoteSchema = z.object({
+  ticket_id: z.string().uuid(),
+  body: z.string().trim().min(1).max(4000),
+});
+
+export const addTicketNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AddNoteSchema.parse(input))
+  .handler(async ({ data, context }): Promise<{ note: TicketNote }> => {
+    const { ticket, role, name } = await assertNoteAccess(data.ticket_id, context.userId);
+    if (ticket.status === "Resolved") {
+      throw new Error("This ticket is resolved — the conversation is closed.");
+    }
+    const { data: row, error } = await supabaseAdmin
+      .from("ticket_notes")
+      .insert({
+        ticket_id: data.ticket_id,
+        author_id: context.userId,
+        author_name: name,
+        author_role: role,
+        body: data.body,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return { note: row as TicketNote };
+  });
+

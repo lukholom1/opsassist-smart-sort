@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot } from "lucide-react";
+import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot, MessageSquare } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -32,6 +32,7 @@ import {
   DepartmentStatusPills,
   RatingStars,
 } from "@/components/ticket-bits";
+import { NotesDialog } from "@/components/NotesDialog";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
@@ -61,6 +62,7 @@ function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [aiTicket, setAiTicket] = useState<Ticket | null>(null);
   const [rateTicket, setRateTicket] = useState<Ticket | null>(null);
+  const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
 
   async function refresh() {
     const r = (await fetchMine()) as { tickets: Ticket[] };
@@ -153,6 +155,14 @@ function DashboardPage() {
                     )}
                   </div>
                   <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNotesTicket(t)}
+                      className="rounded-full"
+                    >
+                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Conversation
+                    </Button>
                     {t.status !== "Resolved" && (
                       <Button
                         variant="outline"
@@ -211,6 +221,18 @@ function DashboardPage() {
           onClose={() => setRateTicket(null)}
           onSubmitted={() => {
             setRateTicket(null);
+            refresh();
+          }}
+        />
+      )}
+      {notesTicket && (
+        <NotesDialog
+          ticketId={notesTicket.id}
+          ticketTitle={notesTicket.title}
+          viewerRole="user"
+          ticketResolved={notesTicket.status === "Resolved"}
+          onClose={() => {
+            setNotesTicket(null);
             refresh();
           }}
         />

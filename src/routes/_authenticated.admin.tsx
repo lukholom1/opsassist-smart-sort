@@ -29,13 +29,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2 } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
   PriorityPill,
   RatingStars,
 } from "@/components/ticket-bits";
+import { NotesDialog } from "@/components/NotesDialog";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -73,6 +74,7 @@ function AdminPage() {
   const [filterPri, setFilterPri] = useState("all");
   const [saving, setSaving] = useState<string | null>(null);
   const [showUsers, setShowUsers] = useState(false);
+  const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
 
   const isSuperAdmin = department === null;
 
@@ -216,6 +218,7 @@ function AdminPage() {
                 myDept={department}
                 saving={saving}
                 onStatus={changeStatus}
+                onOpenNotes={setNotesTicket}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -226,6 +229,7 @@ function AdminPage() {
                 onStatus={changeStatus}
                 showAi
                 showFeedback
+                onOpenNotes={setNotesTicket}
               />
             </TableSection>
           </>
@@ -233,6 +237,15 @@ function AdminPage() {
       </main>
       <Footer />
       {showUsers && <UsersDialog onClose={() => setShowUsers(false)} />}
+      {notesTicket && (
+        <NotesDialog
+          ticketId={notesTicket.id}
+          ticketTitle={notesTicket.title}
+          viewerRole="admin"
+          ticketResolved={notesTicket.status === "Resolved"}
+          onClose={() => setNotesTicket(null)}
+        />
+      )}
     </div>
   );
 }
@@ -278,6 +291,7 @@ function TicketTable({
   onStatus,
   showAi,
   showFeedback,
+  onOpenNotes,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -285,6 +299,7 @@ function TicketTable({
   onStatus: (assignmentId: string, next: Status) => void;
   showAi?: boolean;
   showFeedback?: boolean;
+  onOpenNotes: (t: Ticket) => void;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
@@ -302,6 +317,7 @@ function TicketTable({
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 font-medium">Time</th>
             {showFeedback && <th className="px-4 py-3 font-medium">Rating</th>}
+            <th className="px-4 py-3 font-medium"></th>
           </tr>
         </thead>
         <tbody>
@@ -378,6 +394,16 @@ function TicketTable({
                     )}
                   </td>
                 )}
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => onOpenNotes(t)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                    title="Open conversation"
+                  >
+                    <MessageSquare size={13} className="text-soft-blue" /> Notes
+                  </button>
+                </td>
               </tr>
             );
           })}
