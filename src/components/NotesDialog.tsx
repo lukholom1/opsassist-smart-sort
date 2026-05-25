@@ -101,23 +101,59 @@ export function NotesDialog({
           ) : (
             notes.map((n) => {
               const mine = n.author_role === viewerRole;
+              const isAdmin = n.author_role === "admin";
+              const initials = (n.author_name || "?")
+                .split(" ")
+                .map((p) => p[0])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join("")
+                .toUpperCase();
+              const avatar = (
+                <div
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ${
+                    isAdmin
+                      ? "bg-soft-blue/15 text-soft-blue ring-soft-blue/30"
+                      : "bg-purple-accent/15 text-purple-accent ring-purple-accent/30"
+                  }`}
+                  title={n.author_name}
+                >
+                  {initials}
+                </div>
+              );
               return (
                 <div
                   key={n.id}
-                  className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                  className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
                 >
-                  <div
-                    className={`max-w-[78%] rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
-                      mine
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-foreground ring-1 ring-border"
-                    }`}
-                  >
-                    <div className={`mb-0.5 text-[10px] uppercase tracking-wider ${mine ? "opacity-80" : "text-muted-foreground"}`}>
-                      {n.author_name} · {n.author_role === "admin" ? "Support" : "User"} · {relTime(n.created_at)}
+                  {!mine && avatar}
+                  <div className={`flex max-w-[75%] flex-col ${mine ? "items-end" : "items-start"}`}>
+                    <div className="mb-1 flex items-center gap-1.5 px-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <span className="font-semibold text-foreground/80">{n.author_name}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-px text-[9px] font-medium ring-1 ring-inset ${
+                          isAdmin
+                            ? "bg-soft-blue/10 text-soft-blue ring-soft-blue/30"
+                            : "bg-purple-accent/10 text-purple-accent ring-purple-accent/30"
+                        }`}
+                      >
+                        {isAdmin ? "Support" : "User"}
+                      </span>
+                      <span>· {relTime(n.created_at)}</span>
                     </div>
-                    <div className="whitespace-pre-wrap leading-relaxed">{n.body}</div>
+                    <div
+                      className={`rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
+                        mine
+                          ? "rounded-br-sm bg-primary text-primary-foreground"
+                          : isAdmin
+                            ? "rounded-bl-sm bg-soft-blue/10 text-foreground ring-1 ring-soft-blue/30"
+                            : "rounded-bl-sm bg-purple-accent/10 text-foreground ring-1 ring-purple-accent/30"
+                      }`}
+                    >
+                      <div className="whitespace-pre-wrap leading-relaxed">{n.body}</div>
+                    </div>
                   </div>
+                  {mine && avatar}
                 </div>
               );
             })
