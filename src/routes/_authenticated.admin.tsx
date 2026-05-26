@@ -524,18 +524,31 @@ function TicketTable({
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenNotes(t);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
-                    title="Open conversation"
-                  >
-                    <MessageSquare size={13} className="text-soft-blue" /> Notes
-                  </button>
+                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {rowAssignments
+                      .filter((a) => !myDept || a.department === myDept)
+                      .filter((a) => a.status !== "Resolved")
+                      .map((a) => (
+                        <button
+                          key={`re-${a.id}`}
+                          type="button"
+                          onClick={() => onReassign(t, a)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                          title={`Reassign ${a.department} assignment`}
+                        >
+                          <ArrowRightLeft size={13} className="text-warning" /> Reassign
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() => onOpenNotes(t)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                      title="Open conversation"
+                    >
+                      <MessageSquare size={13} className="text-soft-blue" /> Notes
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
