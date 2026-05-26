@@ -40,8 +40,7 @@ import {
 import { NotesDialog } from "@/components/NotesDialog";
 import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 import { AdminCharts } from "@/components/AdminCharts";
-import { getAdminAnalytics, generateInsightsReport } from "@/lib/analytics.functions";
-import jsPDF from "jspdf";
+import { getAdminAnalytics } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -83,9 +82,7 @@ function AdminPage() {
   const [detailsTicket, setDetailsTicket] = useState<Ticket | null>(null);
   const [reassignTarget, setReassignTarget] = useState<{ ticket: Ticket; assignment: AssignmentRow } | null>(null);
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getAdminAnalytics>> | null>(null);
-  const [generatingReport, setGeneratingReport] = useState(false);
   const fetchAnalytics = useServerFn(getAdminAnalytics);
-  const fetchInsights = useServerFn(generateInsightsReport);
   const reassign = useServerFn(reassignAssignment);
 
   const isSuperAdmin = department === null;
@@ -100,78 +97,8 @@ function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleGenerateReport() {
-    setGeneratingReport(true);
-    try {
-      const r = await fetchInsights();
-      if (!r || !r.summary) throw new Error("Empty report from server.");
-      const narrative = typeof r.narrative === "string" && r.narrative.length > 0
-        ? r.narrative
-        : "No narrative generated.";
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const margin = 48;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      let y = margin;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("OpsAssist — Insights Report", margin, y);
-      y += 22;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      doc.setTextColor(110);
-      doc.text(`Scope: ${r.summary.scope}`, margin, y);
-      y += 14;
-      doc.text(`Generated: ${new Date(r.summary.generated_at).toLocaleString()}`, margin, y);
-      y += 22;
-      doc.setTextColor(20);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Summary", margin, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const lines = [
-        `Total tickets: ${r.summary.total_tickets}`,
-        `Resolved: ${r.summary.resolved} (${r.summary.resolution_rate}%)`,
-        `Resolved by AI: ${r.summary.resolved_by_ai}`,
-        `Priority — High: ${r.summary.by_priority.High} · Medium: ${r.summary.by_priority.Medium} · Low: ${r.summary.by_priority.Low}`,
-        `Average rating: ${r.summary.avg_rating || "n/a"} / 5  (${r.summary.feedback_count} responses)`,
-        `Avg business-hours resolution: ${r.summary.avg_business_resolution_minutes} min`,
-      ];
-      for (const l of lines) {
-        doc.text(l, margin, y);
-        y += 14;
-      }
-      y += 10;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(`AI Narrative${r.source === "fallback" ? " (auto-generated)" : ""}`, margin, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const wrapped = doc.splitTextToSize(narrative, pageWidth - margin * 2);
-      for (const ln of wrapped) {
-        if (y > pageHeight - margin) {
-          doc.addPage();
-          y = margin;
-        }
-        doc.text(ln, margin, y);
-        y += 13;
-      }
-      const fileScope = (r.summary.scope || "report").replace(/\s+/g, "_");
-      doc.save(`OpsAssist_Insights_${fileScope}_${new Date().toISOString().slice(0, 10)}.pdf`);
-    } catch (e) {
-      console.error("[generateInsightsReport] failed", e);
-      alert(
-        `Could not generate insights report: ${
-          e instanceof Error ? e.message : "unknown error"
-        }`,
-      );
-    } finally {
-      setGeneratingReport(false);
-    }
-  }
+
+
 
   async function changeStatus(assignmentId: string, next: Status) {
     setSaving(assignmentId);
@@ -249,15 +176,10 @@ function AdminPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerateReport}
-              disabled={generatingReport}
+              onClick={() => navigate({ to: "/admin/insights" })}
               className="rounded-lg"
             >
-              {generatingReport ? (
-                <Loader2 size={14} className="mr-1.5 animate-spin" />
-              ) : (
-                <BarChart3 size={14} className="mr-1.5" />
-              )}
+              <BarChart3 size={14} className="mr-1.5" />
               Insights
             </Button>
             {isSuperAdmin && (
