@@ -169,6 +169,13 @@ function AdminPage() {
     try {
       await updateStatus({ data: { assignment_id: assignmentId, status: next } });
       await refresh();
+    } catch (e) {
+      console.error("[updateAssignmentStatus] failed", e);
+      alert(
+        `Could not update status: ${
+          e instanceof Error ? e.message : "unknown error"
+        }`,
+      );
     } finally {
       setSaving(null);
     }
