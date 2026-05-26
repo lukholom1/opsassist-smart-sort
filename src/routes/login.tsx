@@ -148,7 +148,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      await activate({ data: { email, otp, password } });
+      await activate({ data: { email, otp, password, username } });
       // Auto-sign-in after activation.
       const { error: si } = await supabase.auth.signInWithPassword({
         email: normalizeEmail(email),
