@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import jsPDF from "jspdf";
+// jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
+// (it touches window/document at module load).
 import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
@@ -70,6 +71,7 @@ function InsightsPage() {
         typeof report.narrative === "string" && report.narrative.length > 0
           ? report.narrative
           : "No narrative generated.";
+      const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margin = 48;
       const pageWidth = doc.internal.pageSize.getWidth();
