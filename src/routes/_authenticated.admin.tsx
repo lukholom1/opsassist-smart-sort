@@ -415,6 +415,7 @@ function TicketTable({
   showFeedback,
   onOpenNotes,
   onOpenDetails,
+  onReassign,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -424,6 +425,7 @@ function TicketTable({
   showFeedback?: boolean;
   onOpenNotes: (t: Ticket) => void;
   onOpenDetails: (t: Ticket) => void;
+  onReassign: (t: Ticket, a: AssignmentRow) => void;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
