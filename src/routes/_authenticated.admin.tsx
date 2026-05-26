@@ -350,6 +350,24 @@ function AdminPage() {
       {detailsTicket && (
         <TicketDetailsDialog ticket={detailsTicket} onClose={() => setDetailsTicket(null)} />
       )}
+      {reassignTarget && (
+        <ReassignDialog
+          ticket={reassignTarget.ticket}
+          assignment={reassignTarget.assignment}
+          onClose={() => setReassignTarget(null)}
+          onSubmit={async (newDept, note) => {
+            await reassign({
+              data: {
+                assignment_id: reassignTarget.assignment.id,
+                new_department: newDept,
+                note,
+              },
+            });
+            setReassignTarget(null);
+            await refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
