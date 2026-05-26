@@ -559,7 +559,106 @@ function TicketTable({
   );
 }
 
-// ---- Users dialog (super admin only) ----
+// ---- Reassign dialog ----
+const DEPTS: Department[] = ["HR", "IT", "Finance", "Operations"];
+function ReassignDialog({
+  ticket,
+  assignment,
+  onClose,
+  onSubmit,
+}: {
+  ticket: Ticket;
+  assignment: AssignmentRow;
+  onClose: () => void;
+  onSubmit: (newDept: Department, note: string) => Promise<void>;
+}) {
+  const occupied = new Set(ticket.assignments.map((a) => a.department));
+  const options = DEPTS.filter((d) => d !== assignment.department && !occupied.has(d));
+  const [newDept, setNewDept] = useState<Department | "">(options[0] ?? "");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle() {
+    if (!newDept) return;
+    if (note.trim().length < 3) {
+      setErr("Please add a short note explaining the reassignment.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSubmit(newDept as Department, note.trim());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to reassign.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ArrowRightLeft size={16} className="text-warning" /> Reassign ticket
+          </DialogTitle>
+          <DialogDescription>
+            Move <span className="font-medium text-foreground">{ticket.title}</span> from{" "}
+            <span className="font-medium text-foreground">{assignment.department}</span> to another department.
+            A note is required.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="new-dept">New department</Label>
+            {options.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No other department is available — this ticket is already routed everywhere.
+              </p>
+            ) : (
+              <Select value={newDept} onValueChange={(v) => setNewDept(v as Department)}>
+                <SelectTrigger id="new-dept">
+                  <SelectValue placeholder="Pick a department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="reason">Reason / note</Label>
+            <Textarea
+              id="reason"
+              rows={4}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Why is this being moved to the other department?"
+            />
+          </div>
+
+          {err && <p className="text-sm text-destructive">{err}</p>}
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={handle} disabled={busy || !newDept || options.length === 0}>
+              {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Reassign
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 function UsersDialog({ onClose }: { onClose: () => void }) {
   const { session } = useAuth();
   const myId = session?.user.id;
