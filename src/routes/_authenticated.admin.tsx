@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, FileDown } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3 } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -227,6 +227,20 @@ function AdminPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateReport}
+              disabled={generatingReport}
+              className="rounded-lg"
+            >
+              {generatingReport ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <BarChart3 size={14} className="mr-1.5" />
+              )}
+              Insights
+            </Button>
             {isSuperAdmin && (
               <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="rounded-lg">
                 <Users size={14} className="mr-1.5" /> Users
@@ -240,6 +254,12 @@ function AdminPage() {
             </Button>
           </div>
         </div>
+
+        {analytics && (
+          <div className="mt-6">
+            <AdminCharts data={analytics} />
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">
@@ -293,6 +313,7 @@ function AdminPage() {
                 saving={saving}
                 onStatus={changeStatus}
                 onOpenNotes={setNotesTicket}
+                onOpenDetails={setDetailsTicket}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -304,6 +325,7 @@ function AdminPage() {
                 showAi
                 showFeedback
                 onOpenNotes={setNotesTicket}
+                onOpenDetails={setDetailsTicket}
               />
             </TableSection>
           </>
@@ -319,6 +341,9 @@ function AdminPage() {
           ticketResolved={notesTicket.status === "Resolved"}
           onClose={() => setNotesTicket(null)}
         />
+      )}
+      {detailsTicket && (
+        <TicketDetailsDialog ticket={detailsTicket} onClose={() => setDetailsTicket(null)} />
       )}
     </div>
   );
@@ -366,6 +391,7 @@ function TicketTable({
   showAi,
   showFeedback,
   onOpenNotes,
+  onOpenDetails,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -374,6 +400,7 @@ function TicketTable({
   showAi?: boolean;
   showFeedback?: boolean;
   onOpenNotes: (t: Ticket) => void;
+  onOpenDetails: (t: Ticket) => void;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
@@ -400,7 +427,11 @@ function TicketTable({
             // For super admin, show every assignment status.
             const rowAssignments = myDept ? (t.my_assignment ? [t.my_assignment] : []) : t.assignments;
             return (
-              <tr key={t.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
+              <tr
+                key={t.id}
+                onClick={() => onOpenDetails(t)}
+                className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/30"
+              >
                 <td className="px-4 py-3 font-medium">{t.user_name}</td>
                 <td className="max-w-sm px-4 py-3">
                   <div className="flex items-center gap-2 font-medium text-foreground">
@@ -423,7 +454,7 @@ function TicketTable({
                     </div>
                   ))}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-1.5">
                     {rowAssignments.map((a) => (
                       <div key={a.id} className="flex items-center gap-2">
@@ -471,7 +502,10 @@ function TicketTable({
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"
-                    onClick={() => onOpenNotes(t)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenNotes(t);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
                     title="Open conversation"
                   >
