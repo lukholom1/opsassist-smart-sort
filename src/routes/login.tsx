@@ -189,6 +189,19 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
           />
         </div>
         <div className="grid gap-2">
+          <Label>Choose a username</Label>
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="e.g. jane.doe"
+            minLength={3}
+            maxLength={30}
+            pattern="[A-Za-z0-9._-]{3,30}"
+            required
+          />
+          <p className="text-xs text-muted-foreground">3–30 chars: letters, numbers, . _ -</p>
+        </div>
+        <div className="grid gap-2">
           <Label>Choose a password</Label>
           <Input
             type="password"
