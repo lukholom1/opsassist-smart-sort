@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import jsPDF from "jspdf";
+// jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
+// (it touches window/document at module load).
 import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
