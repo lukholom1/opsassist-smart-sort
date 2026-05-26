@@ -227,6 +227,20 @@ function AdminPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateReport}
+              disabled={generatingReport}
+              className="rounded-lg"
+            >
+              {generatingReport ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <BarChart3 size={14} className="mr-1.5" />
+              )}
+              Insights
+            </Button>
             {isSuperAdmin && (
               <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="rounded-lg">
                 <Users size={14} className="mr-1.5" /> Users
