@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { listDeptTickets, updateAssignmentStatus, type AssignmentRow } from "@/lib/tickets.functions";
+import { listDeptTickets, updateAssignmentStatus, reassignAssignment, type AssignmentRow } from "@/lib/tickets.functions";
 import {
   createPendingUser,
   deletePendingUser,
