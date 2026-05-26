@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listDeptTickets, updateAssignmentStatus, reassignAssignment, type AssignmentRow } from "@/lib/tickets.functions";
@@ -174,13 +174,15 @@ function AdminPage() {
           <Logo />
           <div className="flex items-center gap-2">
             <Button
+              asChild
               variant="outline"
               size="sm"
-              onClick={() => navigate({ to: "/admin/insights" })}
               className="rounded-lg"
             >
-              <BarChart3 size={14} className="mr-1.5" />
-              Insights
+              <Link to="/admin/insights">
+                <BarChart3 size={14} className="mr-1.5" />
+                Insights
+              </Link>
             </Button>
             {isSuperAdmin && (
               <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="rounded-lg">
