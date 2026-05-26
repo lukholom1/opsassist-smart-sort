@@ -451,7 +451,7 @@ function TicketTable({
                     </div>
                   ))}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-1.5">
                     {rowAssignments.map((a) => (
                       <div key={a.id} className="flex items-center gap-2">
