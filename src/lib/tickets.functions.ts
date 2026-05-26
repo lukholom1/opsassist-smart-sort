@@ -514,9 +514,12 @@ async function assertNoteAccess(
   if (!isOwner && !isSuper && !isDeptAdmin) {
     throw new Error("You can't access this conversation.");
   }
+  // Admins always post as "admin" — even if they happen to own the ticket
+  // (e.g. super admin testing). Only non-admin owners post as "user".
+  const role: "user" | "admin" = isAdmin ? "admin" : "user";
   return {
     ticket,
-    role: isOwner ? "user" : "admin",
+    role,
     name: profile?.full_name ?? "Unknown",
   };
 }
