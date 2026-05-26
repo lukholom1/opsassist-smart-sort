@@ -388,6 +388,7 @@ function TicketTable({
   showAi,
   showFeedback,
   onOpenNotes,
+  onOpenDetails,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -396,6 +397,7 @@ function TicketTable({
   showAi?: boolean;
   showFeedback?: boolean;
   onOpenNotes: (t: Ticket) => void;
+  onOpenDetails: (t: Ticket) => void;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
