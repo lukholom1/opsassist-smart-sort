@@ -313,6 +313,7 @@ function AdminPage() {
                 saving={saving}
                 onStatus={changeStatus}
                 onOpenNotes={setNotesTicket}
+                onOpenDetails={setDetailsTicket}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -324,6 +325,7 @@ function AdminPage() {
                 showAi
                 showFeedback
                 onOpenNotes={setNotesTicket}
+                onOpenDetails={setDetailsTicket}
               />
             </TableSection>
           </>
