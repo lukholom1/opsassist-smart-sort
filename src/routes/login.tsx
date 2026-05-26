@@ -90,8 +90,8 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
         <div className="grid gap-2">
           <Label>Email or username</Label>
           <Input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             placeholder="Admin or you@company.com"
             autoFocus
             required
