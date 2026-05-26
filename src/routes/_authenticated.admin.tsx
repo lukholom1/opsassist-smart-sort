@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { listDeptTickets, updateAssignmentStatus, type AssignmentRow } from "@/lib/tickets.functions";
+import { listDeptTickets, updateAssignmentStatus, reassignAssignment, type AssignmentRow } from "@/lib/tickets.functions";
 import {
   createPendingUser,
   deletePendingUser,
@@ -29,7 +29,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3 } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, ArrowRightLeft } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import {
   elapsed,
   CategoryPills,
@@ -80,10 +81,12 @@ function AdminPage() {
   const [showUsers, setShowUsers] = useState(false);
   const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
   const [detailsTicket, setDetailsTicket] = useState<Ticket | null>(null);
+  const [reassignTarget, setReassignTarget] = useState<{ ticket: Ticket; assignment: AssignmentRow } | null>(null);
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getAdminAnalytics>> | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const fetchAnalytics = useServerFn(getAdminAnalytics);
   const fetchInsights = useServerFn(generateInsightsReport);
+  const reassign = useServerFn(reassignAssignment);
 
   const isSuperAdmin = department === null;
 
@@ -314,6 +317,7 @@ function AdminPage() {
                 onStatus={changeStatus}
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
+                onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -326,6 +330,7 @@ function AdminPage() {
                 showFeedback
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
+                onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
               />
             </TableSection>
           </>
@@ -344,6 +349,24 @@ function AdminPage() {
       )}
       {detailsTicket && (
         <TicketDetailsDialog ticket={detailsTicket} onClose={() => setDetailsTicket(null)} />
+      )}
+      {reassignTarget && (
+        <ReassignDialog
+          ticket={reassignTarget.ticket}
+          assignment={reassignTarget.assignment}
+          onClose={() => setReassignTarget(null)}
+          onSubmit={async (newDept, note) => {
+            await reassign({
+              data: {
+                assignment_id: reassignTarget.assignment.id,
+                new_department: newDept,
+                note,
+              },
+            });
+            setReassignTarget(null);
+            await refresh();
+          }}
+        />
       )}
     </div>
   );
@@ -392,6 +415,7 @@ function TicketTable({
   showFeedback,
   onOpenNotes,
   onOpenDetails,
+  onReassign,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -401,6 +425,7 @@ function TicketTable({
   showFeedback?: boolean;
   onOpenNotes: (t: Ticket) => void;
   onOpenDetails: (t: Ticket) => void;
+  onReassign: (t: Ticket, a: AssignmentRow) => void;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
@@ -499,18 +524,31 @@ function TicketTable({
                     )}
                   </td>
                 )}
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenNotes(t);
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
-                    title="Open conversation"
-                  >
-                    <MessageSquare size={13} className="text-soft-blue" /> Notes
-                  </button>
+                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {rowAssignments
+                      .filter((a) => !myDept || a.department === myDept)
+                      .filter((a) => a.status !== "Resolved")
+                      .map((a) => (
+                        <button
+                          key={`re-${a.id}`}
+                          type="button"
+                          onClick={() => onReassign(t, a)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                          title={`Reassign ${a.department} assignment`}
+                        >
+                          <ArrowRightLeft size={13} className="text-warning" /> Reassign
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() => onOpenNotes(t)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                      title="Open conversation"
+                    >
+                      <MessageSquare size={13} className="text-soft-blue" /> Notes
+                    </button>
+                  </div>
                 </td>
               </tr>
             );
@@ -521,7 +559,106 @@ function TicketTable({
   );
 }
 
-// ---- Users dialog (super admin only) ----
+// ---- Reassign dialog ----
+const DEPTS: Department[] = ["HR", "IT", "Finance", "Operations"];
+function ReassignDialog({
+  ticket,
+  assignment,
+  onClose,
+  onSubmit,
+}: {
+  ticket: Ticket;
+  assignment: AssignmentRow;
+  onClose: () => void;
+  onSubmit: (newDept: Department, note: string) => Promise<void>;
+}) {
+  const occupied = new Set(ticket.assignments.map((a) => a.department));
+  const options = DEPTS.filter((d) => d !== assignment.department && !occupied.has(d));
+  const [newDept, setNewDept] = useState<Department | "">(options[0] ?? "");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handle() {
+    if (!newDept) return;
+    if (note.trim().length < 3) {
+      setErr("Please add a short note explaining the reassignment.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSubmit(newDept as Department, note.trim());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to reassign.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ArrowRightLeft size={16} className="text-warning" /> Reassign ticket
+          </DialogTitle>
+          <DialogDescription>
+            Move <span className="font-medium text-foreground">{ticket.title}</span> from{" "}
+            <span className="font-medium text-foreground">{assignment.department}</span> to another department.
+            A note is required.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="new-dept">New department</Label>
+            {options.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No other department is available — this ticket is already routed everywhere.
+              </p>
+            ) : (
+              <Select value={newDept} onValueChange={(v) => setNewDept(v as Department)}>
+                <SelectTrigger id="new-dept">
+                  <SelectValue placeholder="Pick a department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="reason">Reason / note</Label>
+            <Textarea
+              id="reason"
+              rows={4}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Why is this being moved to the other department?"
+            />
+          </div>
+
+          {err && <p className="text-sm text-destructive">{err}</p>}
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={onClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={handle} disabled={busy || !newDept || options.length === 0}>
+              {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
+              Reassign
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 function UsersDialog({ onClose }: { onClose: () => void }) {
   const { session } = useAuth();
   const myId = session?.user.id;

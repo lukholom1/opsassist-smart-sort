@@ -294,6 +294,97 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Reassign an assignment to a different department (with mandatory note).
+const ReassignSchema = z.object({
+  assignment_id: z.string().uuid(),
+  new_department: z.enum(DEPARTMENTS),
+  note: z.string().trim().min(3).max(2000),
+});
+
+export const reassignAssignment = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => ReassignSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const dept = context.department as Department | null;
+    const { data: current, error: cErr } = await supabaseAdmin
+      .from("ticket_assignments")
+      .select("id, ticket_id, department, status")
+      .eq("id", data.assignment_id)
+      .single();
+    if (cErr || !current) throw new Error("Assignment not found.");
+    if (dept && current.department !== dept) {
+      throw new Error("You can only reassign tickets in your department.");
+    }
+    if (current.department === data.new_department) {
+      throw new Error("Ticket is already assigned to that department.");
+    }
+
+    // Refuse if the ticket already has an assignment for the target department.
+    const { data: existing } = await supabaseAdmin
+      .from("ticket_assignments")
+      .select("id")
+      .eq("ticket_id", current.ticket_id)
+      .eq("department", data.new_department)
+      .maybeSingle();
+    if (existing) {
+      throw new Error(`This ticket is already routed to ${data.new_department}.`);
+    }
+
+    const newAssignee = await pickLeastBusyAdminForDept(data.new_department);
+
+    const { error: uErr } = await supabaseAdmin
+      .from("ticket_assignments")
+      .update({
+        department: data.new_department,
+        assigned_to: newAssignee,
+        status: "Open",
+        resolved_at: null,
+        resolved_by_ai: false,
+      })
+      .eq("id", data.assignment_id);
+    if (uErr) throw new Error(uErr.message);
+
+    // Update ticket categories: swap old dept for new (preserve other depts).
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("categories, status")
+      .eq("id", current.ticket_id)
+      .single();
+    const cats = new Set<string>((ticket?.categories ?? []) as string[]);
+    cats.delete(current.department);
+    cats.add(data.new_department);
+    const newCats = Array.from(cats);
+    await supabaseAdmin
+      .from("tickets")
+      .update({
+        categories: newCats,
+        category: newCats[0] ?? data.new_department,
+        // If the parent was Resolved (edge case), re-open it.
+        ...(ticket?.status === "Resolved"
+          ? { status: "Open", resolved_at: null, resolved_by_ai: false, resolution_source: null }
+          : {}),
+      })
+      .eq("id", current.ticket_id);
+
+    // Author note documenting the reassignment.
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const author_name = profile?.full_name ?? "Admin";
+    const body = `🔁 Reassigned from ${current.department} to ${data.new_department}.\n\nReason: ${data.note}`;
+    await supabaseAdmin.from("ticket_notes").insert({
+      ticket_id: current.ticket_id,
+      author_id: context.userId,
+      author_name,
+      author_role: "admin",
+      body,
+    });
+
+    return { ok: true };
+  });
+
 // User marks their ticket resolved by AI.
 const ResolveByAiSchema = z.object({ id: z.string().uuid() });
 export const markResolvedByAI = createServerFn({ method: "POST" })
