@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, FileDown } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3 } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
