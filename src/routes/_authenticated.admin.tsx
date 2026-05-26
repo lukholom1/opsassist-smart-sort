@@ -150,7 +150,7 @@ function AdminPage() {
       y += 16;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      const wrapped = doc.splitTextToSize(r.narrative, pageWidth - margin * 2);
+      const wrapped = doc.splitTextToSize(narrative, pageWidth - margin * 2);
       for (const ln of wrapped) {
         if (y > pageHeight - margin) {
           doc.addPage();
