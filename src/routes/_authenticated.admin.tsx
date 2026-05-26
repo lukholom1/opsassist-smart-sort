@@ -317,6 +317,7 @@ function AdminPage() {
                 onStatus={changeStatus}
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
+                onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -329,6 +330,7 @@ function AdminPage() {
                 showFeedback
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
+                onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
               />
             </TableSection>
           </>
