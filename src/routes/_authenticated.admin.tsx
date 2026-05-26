@@ -176,15 +176,10 @@ function AdminPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleGenerateReport}
-              disabled={generatingReport}
+              onClick={() => navigate({ to: "/admin/insights" })}
               className="rounded-lg"
             >
-              {generatingReport ? (
-                <Loader2 size={14} className="mr-1.5 animate-spin" />
-              ) : (
-                <BarChart3 size={14} className="mr-1.5" />
-              )}
+              <BarChart3 size={14} className="mr-1.5" />
               Insights
             </Button>
             {isSuperAdmin && (
