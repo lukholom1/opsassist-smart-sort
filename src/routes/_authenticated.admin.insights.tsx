@@ -293,6 +293,29 @@ function InsightsPage() {
           )}
         </section>
 
+        {/* Bottom download CTA */}
+        <section className="mt-10 flex flex-col items-center justify-center gap-3 rounded-3xl border border-border/60 bg-gradient-to-br from-soft-blue/10 via-purple-accent/5 to-transparent p-8 text-center shadow-[var(--shadow-soft)]">
+          <h3 className="text-lg font-semibold tracking-tight">
+            Download the {scopeLabel} report
+          </h3>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Export the full insights report — summary metrics and AI narrative — as a PDF for sharing or archiving.
+          </p>
+          <Button
+            size="lg"
+            onClick={handleDownload}
+            disabled={!report || downloading}
+            className="mt-2 rounded-xl"
+          >
+            {downloading ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : (
+              <Download size={16} className="mr-2" />
+            )}
+            Download PDF report
+          </Button>
+        </section>
+
         <p className="mt-6 text-xs text-muted-foreground">
           Signed in as {fullName ?? "Admin"}
           {department && <> · {department}</>}
