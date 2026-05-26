@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { activateAccount } from "@/lib/users.functions";
+import { activateAccount, resolveLoginEmail } from "@/lib/users.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,8 @@ function normalizeEmail(input: string) {
 
 function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdmin?: boolean }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState(isAdmin ? "Admin" : "");
+  const resolve = useServerFn(resolveLoginEmail);
+  const [identifier, setIdentifier] = useState(isAdmin ? "Admin" : "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,19 +65,18 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalizeEmail(email),
-      password,
-    });
-    setLoading(false);
-    if (error) {
+    try {
+      const { email } = await resolve({ data: { identifier } });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError("Invalid credentials. Try again.");
+        return;
+      }
+      navigate({ to: isAdmin ? "/admin" : "/" });
+    } catch {
       setError("Invalid credentials. Try again.");
-      return;
-    }
-    if (isAdmin) {
-      navigate({ to: "/admin" });
-    } else {
-      navigate({ to: "/" });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -90,8 +90,8 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
         <div className="grid gap-2">
           <Label>Email or username</Label>
           <Input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             placeholder="Admin or you@company.com"
             autoFocus
             required
@@ -138,6 +138,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -147,7 +148,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      await activate({ data: { email, otp, password } });
+      await activate({ data: { email, otp, password, username } });
       // Auto-sign-in after activation.
       const { error: si } = await supabase.auth.signInWithPassword({
         email: normalizeEmail(email),
@@ -186,6 +187,19 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
             maxLength={6}
             required
           />
+        </div>
+        <div className="grid gap-2">
+          <Label>Choose a username</Label>
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="e.g. jane.doe"
+            minLength={3}
+            maxLength={30}
+            pattern="[A-Za-z0-9._-]{3,30}"
+            required
+          />
+          <p className="text-xs text-muted-foreground">3–30 chars: letters, numbers, . _ -</p>
         </div>
         <div className="grid gap-2">
           <Label>Choose a password</Label>

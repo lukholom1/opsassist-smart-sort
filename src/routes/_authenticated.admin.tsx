@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, FileDown } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -37,6 +37,10 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
+import { AdminCharts } from "@/components/AdminCharts";
+import { getAdminAnalytics, generateInsightsReport } from "@/lib/analytics.functions";
+import jsPDF from "jspdf";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -75,17 +79,87 @@ function AdminPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [showUsers, setShowUsers] = useState(false);
   const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
+  const [detailsTicket, setDetailsTicket] = useState<Ticket | null>(null);
+  const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getAdminAnalytics>> | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const fetchAnalytics = useServerFn(getAdminAnalytics);
+  const fetchInsights = useServerFn(generateInsightsReport);
 
   const isSuperAdmin = department === null;
 
   async function refresh() {
     const r = (await fetchTickets()) as { tickets: Ticket[] };
     setTickets(r.tickets);
+    fetchAnalytics().then(setAnalytics).catch(() => {});
   }
   useEffect(() => {
     refresh().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleGenerateReport() {
+    setGeneratingReport(true);
+    try {
+      const r = await fetchInsights();
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const margin = 48;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let y = margin;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("OpsAssist — Insights Report", margin, y);
+      y += 22;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(110);
+      doc.text(`Scope: ${r.summary.scope}`, margin, y);
+      y += 14;
+      doc.text(`Generated: ${new Date(r.summary.generated_at).toLocaleString()}`, margin, y);
+      y += 22;
+      doc.setTextColor(20);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text("Summary", margin, y);
+      y += 16;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const lines = [
+        `Total tickets: ${r.summary.total_tickets}`,
+        `Resolved: ${r.summary.resolved} (${r.summary.resolution_rate}%)`,
+        `Resolved by AI: ${r.summary.resolved_by_ai}`,
+        `Priority — High: ${r.summary.by_priority.High} · Medium: ${r.summary.by_priority.Medium} · Low: ${r.summary.by_priority.Low}`,
+        `Average rating: ${r.summary.avg_rating || "n/a"} / 5  (${r.summary.feedback_count} responses)`,
+        `Avg business-hours resolution: ${r.summary.avg_business_resolution_minutes} min`,
+      ];
+      for (const l of lines) {
+        doc.text(l, margin, y);
+        y += 14;
+      }
+      y += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(`AI Narrative${r.source === "fallback" ? " (auto-generated)" : ""}`, margin, y);
+      y += 16;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const wrapped = doc.splitTextToSize(r.narrative, pageWidth - margin * 2);
+      for (const ln of wrapped) {
+        if (y > pageHeight - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(ln, margin, y);
+        y += 13;
+      }
+      const fileScope = (r.summary.scope || "report").replace(/\s+/g, "_");
+      doc.save(`OpsAssist_Insights_${fileScope}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to generate report.");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
 
   async function changeStatus(assignmentId: string, next: Status) {
     setSaving(assignmentId);

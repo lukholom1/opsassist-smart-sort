@@ -120,17 +120,41 @@ export const listUsers = createServerFn({ method: "GET" })
     };
   });
 
-// ---- Public: activate account via OTP ----
+// ---- Public: resolve a username-or-email login identifier to the canonical email ----
+const ResolveLoginSchema = z.object({ identifier: z.string().trim().min(1).max(120) });
+
+export const resolveLoginEmail = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => ResolveLoginSchema.parse(input))
+  .handler(async ({ data }) => {
+    const raw = data.identifier.trim();
+    if (raw.includes("@")) return { email: raw.toLowerCase() };
+    // Try username lookup (case-insensitive)
+    const { data: byUsername } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .ilike("username", raw)
+      .maybeSingle();
+    if (byUsername?.email) return { email: byUsername.email };
+    // Fall back to legacy local domain (e.g. "Admin" -> "admin@opsassist.local")
+    return { email: normalizeEmail(raw) };
+  });
+
+// ---- Public: activate account via OTP (with self-chosen username) ----
+const USERNAME_RX = /^[A-Za-z0-9._-]{3,30}$/;
 const ActivateSchema = z.object({
   email: z.string().trim().min(3).max(120),
   otp: z.string().trim().length(6),
   password: z.string().min(8).max(72),
+  username: z.string().trim().min(3).max(30).regex(USERNAME_RX, {
+    message: "Username must be 3–30 characters: letters, numbers, . _ -",
+  }),
 });
 
 export const activateAccount = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ActivateSchema.parse(input))
   .handler(async ({ data }) => {
     const email = normalizeEmail(data.email);
+    const username = data.username.trim();
 
     const { data: pending, error: fetchErr } = await supabaseAdmin
       .from("pending_activations")
@@ -141,6 +165,14 @@ export const activateAccount = createServerFn({ method: "POST" })
     if (fetchErr) throw new Error(fetchErr.message);
     if (!pending) throw new Error("No pending invitation for that email.");
     if (pending.otp_code !== data.otp) throw new Error("Incorrect activation code.");
+
+    // Ensure username is unique (case-insensitive)
+    const { data: taken } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("username", username)
+      .maybeSingle();
+    if (taken) throw new Error("That username is already taken. Please pick another.");
 
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -156,6 +188,7 @@ export const activateAccount = createServerFn({ method: "POST" })
       id: userId,
       full_name: pending.full_name,
       email,
+      username,
       department: pending.department,
     });
     await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: pending.role });
