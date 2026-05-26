@@ -424,7 +424,11 @@ function TicketTable({
             // For super admin, show every assignment status.
             const rowAssignments = myDept ? (t.my_assignment ? [t.my_assignment] : []) : t.assignments;
             return (
-              <tr key={t.id} className="border-b border-border/60 last:border-0 hover:bg-muted/30">
+              <tr
+                key={t.id}
+                onClick={() => onOpenDetails(t)}
+                className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/30"
+              >
                 <td className="px-4 py-3 font-medium">{t.user_name}</td>
                 <td className="max-w-sm px-4 py-3">
                   <div className="flex items-center gap-2 font-medium text-foreground">
