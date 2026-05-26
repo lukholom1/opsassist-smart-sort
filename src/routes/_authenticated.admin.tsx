@@ -104,6 +104,10 @@ function AdminPage() {
     setGeneratingReport(true);
     try {
       const r = await fetchInsights();
+      if (!r || !r.summary) throw new Error("Empty report from server.");
+      const narrative = typeof r.narrative === "string" && r.narrative.length > 0
+        ? r.narrative
+        : "No narrative generated.";
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margin = 48;
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -146,7 +150,7 @@ function AdminPage() {
       y += 16;
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
-      const wrapped = doc.splitTextToSize(r.narrative, pageWidth - margin * 2);
+      const wrapped = doc.splitTextToSize(narrative, pageWidth - margin * 2);
       for (const ln of wrapped) {
         if (y > pageHeight - margin) {
           doc.addPage();
@@ -158,7 +162,12 @@ function AdminPage() {
       const fileScope = (r.summary.scope || "report").replace(/\s+/g, "_");
       doc.save(`OpsAssist_Insights_${fileScope}_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to generate report.");
+      console.error("[generateInsightsReport] failed", e);
+      alert(
+        `Could not generate insights report: ${
+          e instanceof Error ? e.message : "unknown error"
+        }`,
+      );
     } finally {
       setGeneratingReport(false);
     }
@@ -169,6 +178,13 @@ function AdminPage() {
     try {
       await updateStatus({ data: { assignment_id: assignmentId, status: next } });
       await refresh();
+    } catch (e) {
+      console.error("[updateAssignmentStatus] failed", e);
+      alert(
+        `Could not update status: ${
+          e instanceof Error ? e.message : "unknown error"
+        }`,
+      );
     } finally {
       setSaving(null);
     }
