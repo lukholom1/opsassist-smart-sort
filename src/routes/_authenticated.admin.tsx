@@ -254,6 +254,12 @@ function AdminPage() {
             </Button>
           </div>
         </div>
+
+        {analytics && (
+          <div className="mt-6">
+            <AdminCharts data={analytics} />
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-7xl px-6 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">
