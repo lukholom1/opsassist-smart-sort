@@ -29,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare } from "lucide-react";
+import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, FileDown } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -37,6 +37,10 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
+import { AdminCharts } from "@/components/AdminCharts";
+import { getAdminAnalytics, generateInsightsReport } from "@/lib/analytics.functions";
+import jsPDF from "jspdf";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
