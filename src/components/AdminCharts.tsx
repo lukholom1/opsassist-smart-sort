@@ -43,11 +43,14 @@ function formatMinutes(m: number) {
 
 export function AdminCharts({ data }: { data: Analytics }) {
   const tooltipStyle = {
-    background: "hsl(var(--card))",
-    border: "1px solid hsl(var(--border))",
+    background: "var(--card)",
+    border: "1px solid var(--border)",
     borderRadius: 8,
     fontSize: 12,
+    color: "var(--foreground)",
   };
+  const axisStroke = "var(--muted-foreground)";
+  const gridStroke = "var(--border)";
 
   return (
     <div className="grid gap-4 lg:grid-cols-3">
@@ -57,14 +60,14 @@ export function AdminCharts({ data }: { data: Analytics }) {
       >
         <ResponsiveContainer>
           <BarChart data={data.traffic}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-            <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.3} />
+            <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke={axisStroke} />
+            <YAxis tick={{ fontSize: 11 }} stroke={axisStroke} allowDecimals={false} />
             <Tooltip contentStyle={tooltipStyle} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="High" stackId="a" fill="hsl(var(--destructive))" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="Medium" stackId="a" fill="hsl(var(--warning))" />
-            <Bar dataKey="Low" stackId="a" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="High" stackId="a" fill="var(--destructive)" />
+            <Bar dataKey="Medium" stackId="a" fill="var(--warning)" />
+            <Bar dataKey="Low" stackId="a" fill="var(--success)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -72,11 +75,11 @@ export function AdminCharts({ data }: { data: Analytics }) {
       <ChartCard title="Average Handling Time" subtitle="Business-hours average across all tickets">
         <ResponsiveContainer>
           <BarChart data={data.handling} layout="vertical" margin={{ left: 12 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.3} />
             <XAxis
               type="number"
               tick={{ fontSize: 11 }}
-              stroke="hsl(var(--muted-foreground))"
+              stroke={axisStroke}
               tickFormatter={formatMinutes}
             />
             <YAxis
@@ -84,13 +87,13 @@ export function AdminCharts({ data }: { data: Analytics }) {
               dataKey="metric"
               width={110}
               tick={{ fontSize: 11 }}
-              stroke="hsl(var(--muted-foreground))"
+              stroke={axisStroke}
             />
             <Tooltip
               contentStyle={tooltipStyle}
               formatter={(v: number) => [formatMinutes(v), "Avg time"]}
             />
-            <Bar dataKey="minutes" radius={[0, 8, 8, 0]} fill="hsl(var(--primary))" />
+            <Bar dataKey="minutes" radius={[0, 8, 8, 0]} fill="var(--primary)" />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
@@ -98,11 +101,11 @@ export function AdminCharts({ data }: { data: Analytics }) {
       <ChartCard title="Ticket Rating" subtitle="User satisfaction distribution">
         <ResponsiveContainer>
           <BarChart data={data.ratings}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-            <XAxis dataKey="rating" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-            <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} opacity={0.3} />
+            <XAxis dataKey="rating" tick={{ fontSize: 11 }} stroke={axisStroke} />
+            <YAxis tick={{ fontSize: 11 }} stroke={axisStroke} allowDecimals={false} />
             <Tooltip contentStyle={tooltipStyle} />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="hsl(var(--purple-accent, 270 70% 60%))" />
+            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="var(--purple-accent)" />
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
