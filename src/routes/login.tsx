@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { activateAccount } from "@/lib/users.functions";
+import { activateAccount, resolveLoginEmail } from "@/lib/users.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
