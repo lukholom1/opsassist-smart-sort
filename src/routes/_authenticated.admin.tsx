@@ -81,10 +81,12 @@ function AdminPage() {
   const [showUsers, setShowUsers] = useState(false);
   const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
   const [detailsTicket, setDetailsTicket] = useState<Ticket | null>(null);
+  const [reassignTarget, setReassignTarget] = useState<{ ticket: Ticket; assignment: AssignmentRow } | null>(null);
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getAdminAnalytics>> | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const fetchAnalytics = useServerFn(getAdminAnalytics);
   const fetchInsights = useServerFn(generateInsightsReport);
+  const reassign = useServerFn(reassignAssignment);
 
   const isSuperAdmin = department === null;
 
