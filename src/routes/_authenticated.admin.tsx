@@ -104,6 +104,10 @@ function AdminPage() {
     setGeneratingReport(true);
     try {
       const r = await fetchInsights();
+      if (!r || !r.summary) throw new Error("Empty report from server.");
+      const narrative = typeof r.narrative === "string" && r.narrative.length > 0
+        ? r.narrative
+        : "No narrative generated.";
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margin = 48;
       const pageWidth = doc.internal.pageSize.getWidth();
