@@ -342,6 +342,9 @@ function AdminPage() {
           onClose={() => setNotesTicket(null)}
         />
       )}
+      {detailsTicket && (
+        <TicketDetailsDialog ticket={detailsTicket} onClose={() => setDetailsTicket(null)} />
+      )}
     </div>
   );
 }
