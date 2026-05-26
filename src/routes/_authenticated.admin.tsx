@@ -162,7 +162,12 @@ function AdminPage() {
       const fileScope = (r.summary.scope || "report").replace(/\s+/g, "_");
       doc.save(`OpsAssist_Insights_${fileScope}_${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to generate report.");
+      console.error("[generateInsightsReport] failed", e);
+      alert(
+        `Could not generate insights report: ${
+          e instanceof Error ? e.message : "unknown error"
+        }`,
+      );
     } finally {
       setGeneratingReport(false);
     }
