@@ -71,6 +71,7 @@ function InsightsPage() {
         typeof report.narrative === "string" && report.narrative.length > 0
           ? report.narrative
           : "No narrative generated.";
+      const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const margin = 48;
       const pageWidth = doc.internal.pageSize.getWidth();
