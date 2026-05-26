@@ -40,8 +40,7 @@ import {
 import { NotesDialog } from "@/components/NotesDialog";
 import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 import { AdminCharts } from "@/components/AdminCharts";
-import { getAdminAnalytics, generateInsightsReport } from "@/lib/analytics.functions";
-import jsPDF from "jspdf";
+import { getAdminAnalytics } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
