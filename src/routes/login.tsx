@@ -55,7 +55,8 @@ function normalizeEmail(input: string) {
 
 function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdmin?: boolean }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState(isAdmin ? "Admin" : "");
+  const resolve = useServerFn(resolveLoginEmail);
+  const [identifier, setIdentifier] = useState(isAdmin ? "Admin" : "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,19 +65,18 @@ function SignInForm({ onSwitch, isAdmin = false }: { onSwitch: () => void; isAdm
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalizeEmail(email),
-      password,
-    });
-    setLoading(false);
-    if (error) {
+    try {
+      const { email } = await resolve({ data: { identifier } });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError("Invalid credentials. Try again.");
+        return;
+      }
+      navigate({ to: isAdmin ? "/admin" : "/" });
+    } catch {
       setError("Invalid credentials. Try again.");
-      return;
-    }
-    if (isAdmin) {
-      navigate({ to: "/admin" });
-    } else {
-      navigate({ to: "/" });
+    } finally {
+      setLoading(false);
     }
   }
 
