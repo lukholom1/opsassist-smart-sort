@@ -499,7 +499,10 @@ function TicketTable({
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"
-                    onClick={() => onOpenNotes(t)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenNotes(t);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
                     title="Open conversation"
                   >
