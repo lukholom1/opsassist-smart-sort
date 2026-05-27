@@ -74,6 +74,10 @@ function DashboardPage() {
 
   useEffect(() => {
     refresh().finally(() => setLoading(false));
+    const id = setInterval(() => {
+      refresh().catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
