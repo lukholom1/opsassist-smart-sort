@@ -38,6 +38,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
 import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 import { AdminCharts } from "@/components/AdminCharts";
 import { getAdminAnalytics } from "@/lib/analytics.functions";
