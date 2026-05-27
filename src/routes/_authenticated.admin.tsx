@@ -295,7 +295,11 @@ function AdminPage() {
           ticketTitle={notesTicket.title}
           viewerRole="admin"
           ticketResolved={notesTicket.status === "Resolved"}
-          onClose={() => setNotesTicket(null)}
+          onClose={() => {
+            markNotesSeen(notesTicket.id);
+            setNotesTicket(null);
+            refresh();
+          }}
         />
       )}
       {detailsTicket && (
