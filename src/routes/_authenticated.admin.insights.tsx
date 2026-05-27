@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 // jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
 // (it touches window/document at module load).
-import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   getAdminAnalytics,
   generateInsightsReport,
+  generateDeepInsights,
 } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/insights")({
