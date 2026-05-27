@@ -52,6 +52,8 @@ type Ticket = {
   resolved_by_ai: boolean;
   assignments: AssignmentRow[];
   feedback: { rating: number; comment: string | null } | null;
+  last_note_at: string | null;
+  last_note_role: "user" | "admin" | null;
 };
 
 function DashboardPage() {
