@@ -267,9 +267,10 @@ export const listDeptTickets = createServerFn({ method: "GET" })
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     const ids = (data ?? []).map((t) => t.id);
-    const [assignments, feedback] = await Promise.all([
+    const [assignments, feedback, latestNotes] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
+      fetchLatestNotesForTickets(ids),
     ]);
     return {
       isSuperAdmin: dept === null,
@@ -278,6 +279,8 @@ export const listDeptTickets = createServerFn({ method: "GET" })
         ...t,
         assignments: assignments.get(t.id) ?? [],
         feedback: feedback.get(t.id) ?? null,
+        last_note_at: latestNotes.get(t.id)?.last_note_at ?? null,
+        last_note_role: latestNotes.get(t.id)?.last_note_role ?? null,
         // Per-department status visible to this admin
         my_assignment:
           (assignments.get(t.id) ?? []).find((a) => !dept || a.department === dept) ?? null,
