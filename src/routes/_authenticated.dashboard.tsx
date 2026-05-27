@@ -73,11 +73,26 @@ function DashboardPage() {
   }
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false));
-    const id = setInterval(() => {
-      refresh().catch(() => {});
-    }, 15000);
-    return () => clearInterval(id);
+    let id: ReturnType<typeof setInterval> | undefined;
+    (async () => {
+      // Wait for Supabase to hydrate the session from storage before calling
+      // any protected server fn, otherwise no Bearer token is attached.
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase.auth.getSession();
+      try {
+        await refresh();
+      } catch {
+        /* ignore */
+      } finally {
+        setLoading(false);
+      }
+      id = setInterval(() => {
+        refresh().catch(() => {});
+      }, 15000);
+    })();
+    return () => {
+      if (id) clearInterval(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
