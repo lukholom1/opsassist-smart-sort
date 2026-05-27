@@ -204,6 +204,25 @@ async function fetchFeedbackForTickets(ticketIds: string[]) {
   return new Map((data ?? []).map((f) => [f.ticket_id, { rating: f.rating, comment: f.comment }]));
 }
 
+async function fetchLatestNotesForTickets(ticketIds: string[]) {
+  const map = new Map<string, { last_note_at: string; last_note_role: "user" | "admin" }>();
+  if (ticketIds.length === 0) return map;
+  const { data } = await supabaseAdmin
+    .from("ticket_notes")
+    .select("ticket_id, author_role, created_at")
+    .in("ticket_id", ticketIds)
+    .order("created_at", { ascending: false });
+  for (const row of data ?? []) {
+    if (!map.has(row.ticket_id)) {
+      map.set(row.ticket_id, {
+        last_note_at: row.created_at,
+        last_note_role: row.author_role as "user" | "admin",
+      });
+    }
+  }
+  return map;
+}
+
 // Caller's own tickets.
 export const listMyTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
