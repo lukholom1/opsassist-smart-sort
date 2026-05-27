@@ -22,17 +22,21 @@ export const Route = createFileRoute("/_authenticated/admin/insights")({
 
 type Analytics = Awaited<ReturnType<typeof getAdminAnalytics>>;
 type Report = Awaited<ReturnType<typeof generateInsightsReport>>;
+type Deep = Awaited<ReturnType<typeof generateDeepInsights>>;
 
 function InsightsPage() {
   const { department, fullName } = useAuth();
   const navigate = useNavigate();
   const fetchAnalytics = useServerFn(getAdminAnalytics);
   const fetchInsights = useServerFn(generateInsightsReport);
+  const fetchDeep = useServerFn(generateDeepInsights);
 
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [deep, setDeep] = useState<Deep | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [loadingReport, setLoadingReport] = useState(true);
+  const [loadingDeep, setLoadingDeep] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   const isSuperAdmin = department === null;
