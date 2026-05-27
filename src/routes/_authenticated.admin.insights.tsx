@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 // jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
 // (it touches window/document at module load).
-import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   getAdminAnalytics,
   generateInsightsReport,
+  generateDeepInsights,
 } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/insights")({
@@ -21,17 +22,21 @@ export const Route = createFileRoute("/_authenticated/admin/insights")({
 
 type Analytics = Awaited<ReturnType<typeof getAdminAnalytics>>;
 type Report = Awaited<ReturnType<typeof generateInsightsReport>>;
+type Deep = Awaited<ReturnType<typeof generateDeepInsights>>;
 
 function InsightsPage() {
   const { department, fullName } = useAuth();
   const navigate = useNavigate();
   const fetchAnalytics = useServerFn(getAdminAnalytics);
   const fetchInsights = useServerFn(generateInsightsReport);
+  const fetchDeep = useServerFn(generateDeepInsights);
 
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [deep, setDeep] = useState<Deep | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
   const [loadingReport, setLoadingReport] = useState(true);
+  const [loadingDeep, setLoadingDeep] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   const isSuperAdmin = department === null;
@@ -40,6 +45,7 @@ function InsightsPage() {
   async function loadAll() {
     setLoadingAnalytics(true);
     setLoadingReport(true);
+    setLoadingDeep(true);
     try {
       const a = await fetchAnalytics();
       setAnalytics(a);
@@ -55,6 +61,14 @@ function InsightsPage() {
       console.error("[insights] report failed", e);
     } finally {
       setLoadingReport(false);
+    }
+    try {
+      const d = await fetchDeep();
+      setDeep(d);
+    } catch (e) {
+      console.error("[insights] deep failed", e);
+    } finally {
+      setLoadingDeep(false);
     }
   }
 
@@ -295,6 +309,98 @@ function InsightsPage() {
           )}
         </section>
 
+        {/* Deep AI insights */}
+        <section className="mt-8 rounded-3xl border border-border/60 bg-card/80 p-6 shadow-[var(--shadow-soft)] backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Brain size={16} className="text-purple-accent" />
+              <h2 className="text-sm font-semibold tracking-tight">
+                AI deep insights
+                {deep?.source === "fallback" && (
+                  <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    heuristic
+                  </span>
+                )}
+              </h2>
+            </div>
+            {deep && (
+              <span className="text-xs text-muted-foreground">
+                {deep.stats.total} tickets analysed
+              </span>
+            )}
+          </div>
+
+          {loadingDeep ? (
+            <div className="mt-6 flex h-32 items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Analysing tickets…
+            </div>
+          ) : deep ? (
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <InsightCard icon={<Clock size={14} />} title="Time analysis">
+                <p className="text-sm leading-relaxed text-foreground">{deep.time_analysis}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <Mini label="Median" value={`${deep.stats.median_resolution_minutes} min`} />
+                  <Mini label="Average" value={`${deep.stats.avg_resolution_minutes} min`} />
+                  <Mini label="Fastest" value={`${deep.stats.fastest_minutes} min`} />
+                  <Mini label="Backlog >24h" value={String(deep.stats.backlog_over_24h)} />
+                </div>
+              </InsightCard>
+
+              <InsightCard icon={<AlertTriangle size={14} />} title="Common issues">
+                {deep.common_issues.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No recurring themes detected yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {deep.common_issues.slice(0, 6).map((i, idx) => (
+                      <li key={idx} className="text-sm">
+                        <span className="font-medium text-foreground">{i.theme}</span>
+                        <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">×{i.count}</span>
+                        {i.example && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">e.g. {i.example}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </InsightCard>
+
+              <InsightCard icon={<Wrench size={14} />} title="Common fixes">
+                {deep.common_fixes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Not enough resolution notes yet to summarise fixes.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {deep.common_fixes.slice(0, 6).map((f, idx) => (
+                      <li key={idx} className="text-sm">
+                        <span className="text-foreground">{f.fix}</span>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Applies to: {f.applies_to}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </InsightCard>
+
+              <InsightCard icon={<TrendingUp size={14} />} title="Business insights">
+                <ul className="space-y-1.5">
+                  {deep.business_insights.map((b, idx) => (
+                    <li key={idx} className="text-sm text-foreground">• {b}</li>
+                  ))}
+                </ul>
+                {deep.recommendations.length > 0 && (
+                  <>
+                    <div className="mt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Recommendations</div>
+                    <ul className="mt-1 space-y-1.5">
+                      {deep.recommendations.map((r, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">→ {r}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </InsightCard>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-muted-foreground">No deep insights available.</p>
+          )}
+        </section>
+
         {/* Bottom download CTA */}
         <section className="mt-10 flex flex-col items-center justify-center gap-3 rounded-3xl border border-border/60 bg-gradient-to-br from-soft-blue/10 via-purple-accent/5 to-transparent p-8 text-center shadow-[var(--shadow-soft)]">
           <h3 className="text-lg font-semibold tracking-tight">
@@ -355,6 +461,35 @@ function Kpi({
       <div className={`mt-1 text-2xl font-semibold tracking-tight ${toneClass}`}>
         {value}
       </div>
+    </div>
+  );
+}
+
+function InsightCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-purple-accent">{icon}</span>
+        {title}
+      </div>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-card/60 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
 }
