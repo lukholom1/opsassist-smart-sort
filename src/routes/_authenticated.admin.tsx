@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listDeptTickets, updateAssignmentStatus, reassignAssignment, type AssignmentRow } from "@/lib/tickets.functions";
@@ -44,7 +44,7 @@ import { getAdminAnalytics } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
-  component: AdminPage,
+  component: AdminRoute,
 });
 
 type Status = "Open" | "In Progress" | "Resolved";
@@ -65,6 +65,11 @@ type Ticket = {
   my_assignment: AssignmentRow | null;
   feedback: { rating: number; comment: string | null } | null;
 };
+
+function AdminRoute() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  return pathname === "/admin" ? <AdminPage /> : <Outlet />;
+}
 
 function AdminPage() {
   const navigate = useNavigate();
