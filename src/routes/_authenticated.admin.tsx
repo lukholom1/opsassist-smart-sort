@@ -64,6 +64,8 @@ type Ticket = {
   assignments: AssignmentRow[];
   my_assignment: AssignmentRow | null;
   feedback: { rating: number; comment: string | null } | null;
+  last_note_at: string | null;
+  last_note_role: "user" | "admin" | null;
 };
 
 function AdminRoute() {
