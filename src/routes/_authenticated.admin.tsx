@@ -503,14 +503,15 @@ function TicketTable({
                       title="Open conversation"
                     >
                       <MessageSquare size={13} className="text-soft-blue" /> Notes
-                      {hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "admin") && (
-                        <span
-                          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
-                          aria-label="New message"
-                        >
-                          1
-                        </span>
-                      )}
+                      {t.status !== "Resolved" &&
+                        hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "admin") && (
+                          <span
+                            className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
+                            aria-label="New message"
+                          >
+                            1
+                          </span>
+                        )}
                     </button>
                   </div>
                 </td>

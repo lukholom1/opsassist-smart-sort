@@ -128,7 +128,7 @@ function DashboardPage() {
             </div>
           ) : (
             tickets.map((t) => {
-              const unread = hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "user");
+              const unread = t.status !== "Resolved" && hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "user");
               const dimmed = t.status === "Resolved" && !!t.feedback;
               return (
               <div
