@@ -45,6 +45,7 @@ function InsightsPage() {
   async function loadAll() {
     setLoadingAnalytics(true);
     setLoadingReport(true);
+    setLoadingDeep(true);
     try {
       const a = await fetchAnalytics();
       setAnalytics(a);
@@ -60,6 +61,14 @@ function InsightsPage() {
       console.error("[insights] report failed", e);
     } finally {
       setLoadingReport(false);
+    }
+    try {
+      const d = await fetchDeep();
+      setDeep(d);
+    } catch (e) {
+      console.error("[insights] deep failed", e);
+    } finally {
+      setLoadingDeep(false);
     }
   }
 
