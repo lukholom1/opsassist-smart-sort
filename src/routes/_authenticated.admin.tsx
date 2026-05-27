@@ -44,7 +44,7 @@ import { getAdminAnalytics } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
-  component: AdminPage,
+  component: AdminRoute,
 });
 
 type Status = "Open" | "In Progress" | "Resolved";
@@ -66,9 +66,13 @@ type Ticket = {
   feedback: { rating: number; comment: string | null } | null;
 };
 
+function AdminRoute() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  return pathname === "/admin" ? <AdminPage /> : <Outlet />;
+}
+
 function AdminPage() {
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { signOut, fullName, department } = useAuth();
   const fetchTickets = useServerFn(listDeptTickets);
   const updateStatus = useServerFn(updateAssignmentStatus);
@@ -87,10 +91,6 @@ function AdminPage() {
   const reassign = useServerFn(reassignAssignment);
 
   const isSuperAdmin = department === null;
-
-  if (pathname !== "/admin") {
-    return <Outlet />;
-  }
 
   async function refresh() {
     const r = (await fetchTickets()) as { tickets: Ticket[] };
