@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { listDeptTickets, updateAssignmentStatus, reassignAssignment, type AssignmentRow } from "@/lib/tickets.functions";
@@ -68,6 +68,7 @@ type Ticket = {
 
 function AdminPage() {
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { signOut, fullName, department } = useAuth();
   const fetchTickets = useServerFn(listDeptTickets);
   const updateStatus = useServerFn(updateAssignmentStatus);
@@ -86,6 +87,10 @@ function AdminPage() {
   const reassign = useServerFn(reassignAssignment);
 
   const isSuperAdmin = department === null;
+
+  if (pathname !== "/admin") {
+    return <Outlet />;
+  }
 
   async function refresh() {
     const r = (await fetchTickets()) as { tickets: Ticket[] };
