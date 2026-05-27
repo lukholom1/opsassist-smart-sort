@@ -204,6 +204,25 @@ async function fetchFeedbackForTickets(ticketIds: string[]) {
   return new Map((data ?? []).map((f) => [f.ticket_id, { rating: f.rating, comment: f.comment }]));
 }
 
+async function fetchLatestNotesForTickets(ticketIds: string[]) {
+  const map = new Map<string, { last_note_at: string; last_note_role: "user" | "admin" }>();
+  if (ticketIds.length === 0) return map;
+  const { data } = await supabaseAdmin
+    .from("ticket_notes")
+    .select("ticket_id, author_role, created_at")
+    .in("ticket_id", ticketIds)
+    .order("created_at", { ascending: false });
+  for (const row of data ?? []) {
+    if (!map.has(row.ticket_id)) {
+      map.set(row.ticket_id, {
+        last_note_at: row.created_at,
+        last_note_role: row.author_role as "user" | "admin",
+      });
+    }
+  }
+  return map;
+}
+
 // Caller's own tickets.
 export const listMyTickets = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -215,15 +234,18 @@ export const listMyTickets = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const ids = (data ?? []).map((t) => t.id);
-    const [assignments, feedback] = await Promise.all([
+    const [assignments, feedback, latestNotes] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
+      fetchLatestNotesForTickets(ids),
     ]);
     return {
       tickets: (data ?? []).map((t) => ({
         ...t,
         assignments: assignments.get(t.id) ?? [],
         feedback: feedback.get(t.id) ?? null,
+        last_note_at: latestNotes.get(t.id)?.last_note_at ?? null,
+        last_note_role: latestNotes.get(t.id)?.last_note_role ?? null,
       })),
     };
   });
@@ -245,9 +267,10 @@ export const listDeptTickets = createServerFn({ method: "GET" })
     const { data, error } = await q;
     if (error) throw new Error(error.message);
     const ids = (data ?? []).map((t) => t.id);
-    const [assignments, feedback] = await Promise.all([
+    const [assignments, feedback, latestNotes] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
+      fetchLatestNotesForTickets(ids),
     ]);
     return {
       isSuperAdmin: dept === null,
@@ -256,6 +279,8 @@ export const listDeptTickets = createServerFn({ method: "GET" })
         ...t,
         assignments: assignments.get(t.id) ?? [],
         feedback: feedback.get(t.id) ?? null,
+        last_note_at: latestNotes.get(t.id)?.last_note_at ?? null,
+        last_note_role: latestNotes.get(t.id)?.last_note_role ?? null,
         // Per-department status visible to this admin
         my_assignment:
           (assignments.get(t.id) ?? []).find((a) => !dept || a.department === dept) ?? null,

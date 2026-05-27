@@ -38,6 +38,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
 import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 import { AdminCharts } from "@/components/AdminCharts";
 import { getAdminAnalytics } from "@/lib/analytics.functions";
@@ -64,6 +65,8 @@ type Ticket = {
   assignments: AssignmentRow[];
   my_assignment: AssignmentRow | null;
   feedback: { rating: number; comment: string | null } | null;
+  last_note_at: string | null;
+  last_note_role: "user" | "admin" | null;
 };
 
 function AdminRoute() {
@@ -99,6 +102,10 @@ function AdminPage() {
   }
   useEffect(() => {
     refresh().finally(() => setLoading(false));
+    const id = setInterval(() => {
+      refresh().catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -289,7 +296,11 @@ function AdminPage() {
           ticketTitle={notesTicket.title}
           viewerRole="admin"
           ticketResolved={notesTicket.status === "Resolved"}
-          onClose={() => setNotesTicket(null)}
+          onClose={() => {
+            markNotesSeen(notesTicket.id);
+            setNotesTicket(null);
+            refresh();
+          }}
         />
       )}
       {detailsTicket && (
@@ -488,10 +499,18 @@ function TicketTable({
                     <button
                       type="button"
                       onClick={() => onOpenNotes(t)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                      className="relative inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
                       title="Open conversation"
                     >
                       <MessageSquare size={13} className="text-soft-blue" /> Notes
+                      {hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "admin") && (
+                        <span
+                          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
+                          aria-label="New message"
+                        >
+                          1
+                        </span>
+                      )}
                     </button>
                   </div>
                 </td>

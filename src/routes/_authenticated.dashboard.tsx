@@ -33,6 +33,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
@@ -51,6 +52,8 @@ type Ticket = {
   resolved_by_ai: boolean;
   assignments: AssignmentRow[];
   feedback: { rating: number; comment: string | null } | null;
+  last_note_at: string | null;
+  last_note_role: "user" | "admin" | null;
 };
 
 function DashboardPage() {
@@ -71,6 +74,10 @@ function DashboardPage() {
 
   useEffect(() => {
     refresh().finally(() => setLoading(false));
+    const id = setInterval(() => {
+      refresh().catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -120,10 +127,13 @@ function DashboardPage() {
               You don't have any tickets yet. Click <span className="font-semibold text-foreground">New ticket</span> to start.
             </div>
           ) : (
-            tickets.map((t) => (
+            tickets.map((t) => {
+              const unread = hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "user");
+              const dimmed = t.status === "Resolved" && !!t.feedback;
+              return (
               <div
                 key={t.id}
-                className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-soft)]"
+                className={`rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-soft)] transition ${dimmed ? "opacity-60 grayscale" : ""}`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -132,6 +142,11 @@ function DashboardPage() {
                       {t.resolved_by_ai && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-purple-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-accent ring-1 ring-inset ring-purple-accent/20">
                           <Bot size={10} /> Resolved by AI
+                        </span>
+                      )}
+                      {dimmed && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-inset ring-border">
+                          Closed
                         </span>
                       )}
                     </div>
@@ -159,9 +174,17 @@ function DashboardPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setNotesTicket(t)}
-                      className="rounded-full"
+                      className="relative rounded-full"
                     >
                       <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Conversation
+                      {unread && (
+                        <span
+                          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
+                          aria-label="New message"
+                        >
+                          1
+                        </span>
+                      )}
                     </Button>
                     {t.status !== "Resolved" && (
                       <Button
@@ -185,7 +208,8 @@ function DashboardPage() {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </main>
@@ -232,6 +256,7 @@ function DashboardPage() {
           viewerRole="user"
           ticketResolved={notesTicket.status === "Resolved"}
           onClose={() => {
+            markNotesSeen(notesTicket.id);
             setNotesTicket(null);
             refresh();
           }}
