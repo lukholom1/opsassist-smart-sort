@@ -464,3 +464,32 @@ function Kpi({
     </div>
   );
 }
+
+function InsightCard({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-purple-accent">{icon}</span>
+        {title}
+      </div>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-card/60 px-2 py-1.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-sm font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
