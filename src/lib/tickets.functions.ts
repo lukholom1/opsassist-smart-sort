@@ -234,15 +234,18 @@ export const listMyTickets = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const ids = (data ?? []).map((t) => t.id);
-    const [assignments, feedback] = await Promise.all([
+    const [assignments, feedback, latestNotes] = await Promise.all([
       fetchAssignmentsForTickets(ids),
       fetchFeedbackForTickets(ids),
+      fetchLatestNotesForTickets(ids),
     ]);
     return {
       tickets: (data ?? []).map((t) => ({
         ...t,
         assignments: assignments.get(t.id) ?? [],
         feedback: feedback.get(t.id) ?? null,
+        last_note_at: latestNotes.get(t.id)?.last_note_at ?? null,
+        last_note_role: latestNotes.get(t.id)?.last_note_role ?? null,
       })),
     };
   });
