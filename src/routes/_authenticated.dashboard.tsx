@@ -256,6 +256,7 @@ function DashboardPage() {
           viewerRole="user"
           ticketResolved={notesTicket.status === "Resolved"}
           onClose={() => {
+            markNotesSeen(notesTicket.id);
             setNotesTicket(null);
             refresh();
           }}
