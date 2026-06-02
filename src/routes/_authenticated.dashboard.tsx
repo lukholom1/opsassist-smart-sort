@@ -196,7 +196,7 @@ function DashboardPage() {
                       onClick={() => setNotesTicket(t)}
                       className="relative rounded-full"
                     >
-                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Note
+                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Notes
                       {unreadCount > 0 && (
                         <span
                           className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
