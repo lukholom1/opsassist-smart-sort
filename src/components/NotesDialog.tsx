@@ -81,7 +81,8 @@ export function NotesDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageSquare size={18} className="text-soft-blue" /> Conversation
+            <MessageSquare size={18} className="text-soft-blue" />
+            {viewerRole === "user" ? "Note" : "Conversation"}
           </DialogTitle>
           <DialogDescription className="line-clamp-1">{ticketTitle}</DialogDescription>
         </DialogHeader>

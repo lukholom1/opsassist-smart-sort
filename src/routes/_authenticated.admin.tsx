@@ -38,7 +38,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
-import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
+import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 import { AdminCharts } from "@/components/AdminCharts";
 import { getAdminAnalytics } from "@/lib/analytics.functions";
@@ -92,6 +92,11 @@ function AdminPage() {
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getAdminAnalytics>> | null>(null);
   const fetchAnalytics = useServerFn(getAdminAnalytics);
   const reassign = useServerFn(reassignAssignment);
+  const { counts: unreadCounts, clearTicket } = useNotesRealtime(
+    "admin",
+    tickets,
+    notesTicket?.id ?? null,
+  );
 
   const isSuperAdmin = department === null;
 
@@ -270,6 +275,7 @@ function AdminPage() {
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
                 onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
+                unreadCounts={unreadCounts}
               />
             </TableSection>
             <TableSection title={`Resolved tickets (${resolved.length})`}>
@@ -283,6 +289,7 @@ function AdminPage() {
                 onOpenNotes={setNotesTicket}
                 onOpenDetails={setDetailsTicket}
                 onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
+                unreadCounts={unreadCounts}
               />
             </TableSection>
           </>
@@ -297,7 +304,7 @@ function AdminPage() {
           viewerRole="admin"
           ticketResolved={notesTicket.status === "Resolved"}
           onClose={() => {
-            markNotesSeen(notesTicket.id);
+            clearTicket(notesTicket.id);
             setNotesTicket(null);
             refresh();
           }}
@@ -372,6 +379,7 @@ function TicketTable({
   onOpenNotes,
   onOpenDetails,
   onReassign,
+  unreadCounts,
 }: {
   tickets: Ticket[];
   myDept: Department | null;
@@ -382,6 +390,7 @@ function TicketTable({
   onOpenNotes: (t: Ticket) => void;
   onOpenDetails: (t: Ticket) => void;
   onReassign: (t: Ticket, a: AssignmentRow) => void;
+  unreadCounts: Record<string, number>;
 }) {
   if (tickets.length === 0) {
     return <div className="py-12 text-center text-sm text-muted-foreground">No tickets.</div>;
@@ -503,15 +512,14 @@ function TicketTable({
                       title="Open conversation"
                     >
                       <MessageSquare size={13} className="text-soft-blue" /> Notes
-                      {t.status !== "Resolved" &&
-                        hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "admin") && (
-                          <span
-                            className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
-                            aria-label="New message"
-                          >
-                            1
-                          </span>
-                        )}
+                      {t.status !== "Resolved" && (unreadCounts[t.id] ?? 0) > 0 && (
+                        <span
+                          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
+                          aria-label={`${unreadCounts[t.id]} new message${unreadCounts[t.id] > 1 ? "s" : ""}`}
+                        >
+                          {unreadCounts[t.id] > 9 ? "9+" : unreadCounts[t.id]}
+                        </span>
+                      )}
                     </button>
                   </div>
                 </td>
