@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
@@ -22,18 +22,25 @@ type SeedTicket = {
 };
 
 /**
- * Subscribes to ticket_notes inserts via Supabase Realtime.
- * - Maintains an unread count per ticket (other-role messages only).
- * - Shows a toast notification on each new message from the other role.
- * - Seeds initial unread state from the ticket list's last_note metadata.
+ * Computes per-ticket unread indicator from the server-derived
+ * `last_note_at` + a local "seen" timestamp in localStorage.
+ *
+ * - Recomputes on every tickets refresh (polling picks up new messages
+ *   even when realtime is delayed or blocked).
+ * - Subscribes to realtime INSERTs on ticket_notes as an enhancement:
+ *   bumps the local count and fires a toast immediately.
+ * - When the relevant dialog is open, marks notes as seen (no badge).
  */
 export function useNotesRealtime(
   viewerRole: "user" | "admin",
   tickets: SeedTicket[],
   openTicketId: string | null,
 ) {
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  // Tick used to force re-derivation of counts after a realtime event or
+  // after the user opens/closes a dialog (which mutates localStorage).
+  const [tick, setTick] = useState(0);
   const titlesRef = useRef<Map<string, string>>(new Map());
+  const lastSeenAtRef = useRef<Map<string, string>>(new Map());
   const openRef = useRef<string | null>(openTicketId);
 
   useEffect(() => {
@@ -44,23 +51,56 @@ export function useNotesRealtime(
   // and keep a title map for toast messages.
   useEffect(() => {
     const map = new Map<string, string>();
-    setCounts((prev) => {
-      const next = { ...prev };
-      for (const t of tickets) {
-        map.set(t.id, t.title);
-        if (next[t.id] === undefined) {
-          const unread =
-            t.status !== "Resolved" &&
-            hasUnreadNote(t.id, t.last_note_at, t.last_note_role, viewerRole);
-          next[t.id] = unread ? 1 : 0;
-        }
-      }
-      return next;
-    });
+    for (const t of tickets) map.set(t.id, t.title);
     titlesRef.current = map;
+  }, [tickets]);
+
+  // Derive counts from current server data + local "seen" stamp.
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {};
+    for (const t of tickets) {
+      if (t.status === "Resolved") {
+        result[t.id] = 0;
+        continue;
+      }
+      // If this ticket's dialog is open, treat as read.
+      if (openRef.current === t.id) {
+        result[t.id] = 0;
+        continue;
+      }
+      const unread = hasUnreadNote(
+        t.id,
+        t.last_note_at,
+        t.last_note_role,
+        viewerRole,
+      );
+      result[t.id] = unread ? 1 : 0;
+    }
+    return result;
+    // `tick` is intentionally part of deps so realtime events recompute.
+  }, [tickets, viewerRole, tick]);
+
+  // Detect newly-arrived notes by comparing last_note_at to previous value;
+  // fire a toast for messages from the other role.
+  useEffect(() => {
+    for (const t of tickets) {
+      if (!t.last_note_at || !t.last_note_role) continue;
+      const prev = lastSeenAtRef.current.get(t.id);
+      lastSeenAtRef.current.set(t.id, t.last_note_at);
+      if (!prev) continue; // first sighting — don't toast on initial load
+      if (t.last_note_role === viewerRole) continue;
+      if (new Date(t.last_note_at).getTime() <= new Date(prev).getTime()) continue;
+      if (openRef.current === t.id) {
+        markNotesSeen(t.id, t.last_note_at);
+        continue;
+      }
+      const who = t.last_note_role === "admin" ? "Support" : "User";
+      toast.message(`${who} replied on "${t.title}"`);
+    }
   }, [tickets, viewerRole]);
 
-  // Realtime subscription — RLS scopes inserts to tickets the viewer can access.
+  // Realtime subscription — when an INSERT lands, refresh derivation and
+  // toast immediately with the message body.
   useEffect(() => {
     const channel = supabase
       .channel("ticket_notes_inserts")
@@ -69,18 +109,13 @@ export function useNotesRealtime(
         { event: "INSERT", schema: "public", table: "ticket_notes" },
         (payload) => {
           const note = payload.new as NoteRow;
-          if (note.author_role === viewerRole) return; // ignore own role's messages
+          if (note.author_role === viewerRole) return;
 
-          // If the relevant dialog is open, treat as read.
           if (openRef.current === note.ticket_id) {
             markNotesSeen(note.ticket_id, note.created_at);
+            setTick((n) => n + 1);
             return;
           }
-
-          setCounts((prev) => ({
-            ...prev,
-            [note.ticket_id]: (prev[note.ticket_id] ?? 0) + 1,
-          }));
 
           const title = titlesRef.current.get(note.ticket_id) ?? "ticket";
           const who = note.author_role === "admin" ? "Support" : "User";
@@ -88,6 +123,7 @@ export function useNotesRealtime(
             description:
               note.body.length > 120 ? note.body.slice(0, 120) + "…" : note.body,
           });
+          setTick((n) => n + 1);
         },
       )
       .subscribe();
@@ -98,8 +134,8 @@ export function useNotesRealtime(
   }, [viewerRole]);
 
   const clearTicket = useCallback((ticketId: string) => {
-    setCounts((prev) => (prev[ticketId] ? { ...prev, [ticketId]: 0 } : prev));
     markNotesSeen(ticketId);
+    setTick((n) => n + 1);
   }, []);
 
   return { counts, clearTicket };
