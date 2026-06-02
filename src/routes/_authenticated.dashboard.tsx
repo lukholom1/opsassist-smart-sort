@@ -33,7 +33,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
-import { hasUnreadNote, markNotesSeen } from "@/lib/notes-unread";
+import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
@@ -66,6 +66,11 @@ function DashboardPage() {
   const [aiTicket, setAiTicket] = useState<Ticket | null>(null);
   const [rateTicket, setRateTicket] = useState<Ticket | null>(null);
   const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
+  const { counts: unreadCounts, clearTicket } = useNotesRealtime(
+    "user",
+    tickets,
+    notesTicket?.id ?? null,
+  );
 
   async function refresh() {
     const r = (await fetchMine()) as { tickets: Ticket[] };
@@ -143,7 +148,7 @@ function DashboardPage() {
             </div>
           ) : (
             tickets.map((t) => {
-              const unread = t.status !== "Resolved" && hasUnreadNote(t.id, t.last_note_at, t.last_note_role, "user");
+              const unreadCount = t.status !== "Resolved" ? (unreadCounts[t.id] ?? 0) : 0;
               const dimmed = t.status === "Resolved" && !!t.feedback;
               return (
               <div
@@ -191,13 +196,13 @@ function DashboardPage() {
                       onClick={() => setNotesTicket(t)}
                       className="relative rounded-full"
                     >
-                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Conversation
-                      {unread && (
+                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Note
+                      {unreadCount > 0 && (
                         <span
                           className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
-                          aria-label="New message"
+                          aria-label={`${unreadCount} new message${unreadCount > 1 ? "s" : ""}`}
                         >
-                          1
+                          {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
                       )}
                     </Button>
@@ -271,7 +276,7 @@ function DashboardPage() {
           viewerRole="user"
           ticketResolved={notesTicket.status === "Resolved"}
           onClose={() => {
-            markNotesSeen(notesTicket.id);
+            clearTicket(notesTicket.id);
             setNotesTicket(null);
             refresh();
           }}
