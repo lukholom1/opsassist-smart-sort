@@ -61,11 +61,12 @@ async function scopedTickets(dept: Department | null, range: DateRange = {}) {
   return data ?? [];
 }
 
-export const getAdminAnalytics = createServerFn({ method: "GET" })
+export const getAdminAnalytics = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) => parseRange(input))
+  .handler(async ({ context, data }) => {
     const dept = (context.department ?? null) as Department | null;
-    const tickets = await scopedTickets(dept);
+    const tickets = await scopedTickets(dept, data);
     const ids = tickets.map((t) => t.id);
 
     // Notes for response calculations
