@@ -78,16 +78,18 @@ function InsightsPage() {
   const [loadingReport, setLoadingReport] = useState(true);
   const [loadingDeep, setLoadingDeep] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const weeks = useState<Week[]>(() => buildWeeks(12))[0];
+  const [weekValue, setWeekValue] = useState<string>("all");
 
   const isSuperAdmin = department === null;
   const scopeLabel = isSuperAdmin ? "All Departments" : `${department}`;
 
-  async function loadAll() {
+  async function loadAll(range: { from?: string; to?: string }) {
     setLoadingAnalytics(true);
     setLoadingReport(true);
     setLoadingDeep(true);
     try {
-      const a = await fetchAnalytics();
+      const a = await fetchAnalytics({ data: range });
       setAnalytics(a);
     } catch (e) {
       console.error("[insights] analytics failed", e);
@@ -95,7 +97,7 @@ function InsightsPage() {
       setLoadingAnalytics(false);
     }
     try {
-      const r = await fetchInsights();
+      const r = await fetchInsights({ data: range });
       setReport(r);
     } catch (e) {
       console.error("[insights] report failed", e);
@@ -103,7 +105,7 @@ function InsightsPage() {
       setLoadingReport(false);
     }
     try {
-      const d = await fetchDeep();
+      const d = await fetchDeep({ data: range });
       setDeep(d);
     } catch (e) {
       console.error("[insights] deep failed", e);
@@ -112,10 +114,15 @@ function InsightsPage() {
     }
   }
 
+  function currentRange(): { from?: string; to?: string } {
+    const w = weeks.find((x) => x.value === weekValue);
+    return w ? { from: w.from, to: w.to } : {};
+  }
+
   useEffect(() => {
-    loadAll();
+    loadAll(currentRange());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [weekValue]);
 
   async function handleDownload() {
     if (!report) return;
