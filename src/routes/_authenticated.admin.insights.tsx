@@ -7,20 +7,12 @@ import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getAdminAnalytics,
   generateInsightsReport,
   generateDeepInsights,
-  type AnalyticsRange,
 } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/insights")({
@@ -46,21 +38,16 @@ function InsightsPage() {
   const [loadingReport, setLoadingReport] = useState(true);
   const [loadingDeep, setLoadingDeep] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [rangeKey, setRangeKey] = useState<string>("all");
 
   const isSuperAdmin = department === null;
   const scopeLabel = isSuperAdmin ? "All Departments" : `${department}`;
 
-  const rangeOptions = buildRangeOptions();
-  const currentRange: AnalyticsRange =
-    rangeOptions.find((o) => o.key === rangeKey)?.range ?? {};
-
-  async function loadAll(range: AnalyticsRange) {
+  async function loadAll() {
     setLoadingAnalytics(true);
     setLoadingReport(true);
     setLoadingDeep(true);
     try {
-      const a = await fetchAnalytics({ data: range });
+      const a = await fetchAnalytics();
       setAnalytics(a);
     } catch (e) {
       console.error("[insights] analytics failed", e);
@@ -68,7 +55,7 @@ function InsightsPage() {
       setLoadingAnalytics(false);
     }
     try {
-      const r = await fetchInsights({ data: range });
+      const r = await fetchInsights();
       setReport(r);
     } catch (e) {
       console.error("[insights] report failed", e);
@@ -76,7 +63,7 @@ function InsightsPage() {
       setLoadingReport(false);
     }
     try {
-      const d = await fetchDeep({ data: range });
+      const d = await fetchDeep();
       setDeep(d);
     } catch (e) {
       console.error("[insights] deep failed", e);
@@ -86,9 +73,9 @@ function InsightsPage() {
   }
 
   useEffect(() => {
-    loadAll(currentRange);
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rangeKey]);
+  }, []);
 
   async function handleDownload() {
     if (!report) return;
@@ -189,22 +176,10 @@ function InsightsPage() {
             >
               <ArrowLeft size={14} className="mr-1.5" /> Back
             </Button>
-            <Select value={rangeKey} onValueChange={setRangeKey}>
-              <SelectTrigger className="h-8 w-[180px] rounded-lg text-xs">
-                <SelectValue placeholder="Select range" />
-              </SelectTrigger>
-              <SelectContent>
-                {rangeOptions.map((o) => (
-                  <SelectItem key={o.key} value={o.key} className="text-xs">
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => loadAll(currentRange)}
+              onClick={loadAll}
               disabled={loadingAnalytics || loadingReport}
               className="rounded-lg"
             >
@@ -517,32 +492,4 @@ function Mini({ label, value }: { label: string; value: string }) {
       <div className="text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
-}
-
-type RangeOption = { key: string; label: string; range: AnalyticsRange };
-
-function buildRangeOptions(): RangeOption[] {
-  const opts: RangeOption[] = [{ key: "all", label: "All time", range: {} }];
-  const now = new Date();
-  // Find Monday of this week (treat Sunday as day 7)
-  const day = (now.getDay() + 6) % 7; // 0 = Monday
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
-  for (let i = 0; i < 6; i++) {
-    const start = new Date(monday);
-    start.setDate(monday.getDate() - i * 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 7);
-    const label =
-      i === 0
-        ? "This week"
-        : i === 1
-          ? "Last week"
-          : `Week of ${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
-    opts.push({
-      key: `week-${i}`,
-      label,
-      range: { from: start.toISOString(), to: end.toISOString(), label },
-    });
-  }
-  return opts;
 }
