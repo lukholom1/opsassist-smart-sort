@@ -136,13 +136,22 @@ function SignInForm({
           {isAdmin ? "Sign in" : "User sign in"}
         </Button>
       </form>
-      <button
-        type="button"
-        onClick={onSwitch}
-        className="mt-4 flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-      >
-        <UserPlus size={14} /> New user? Activate your account
-      </button>
+      <div className="mt-4 grid gap-2">
+        <button
+          type="button"
+          onClick={onForgot}
+          className="text-center text-xs font-medium text-muted-foreground transition hover:text-foreground"
+        >
+          Forgot password?
+        </button>
+        <button
+          type="button"
+          onClick={onActivate}
+          className="flex w-full items-center justify-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+        >
+          <UserPlus size={14} /> New user? Activate your account
+        </button>
+      </div>
       <Link to="/" className="mt-4 block text-center text-xs text-muted-foreground hover:text-foreground">
         ← Back home
       </Link>
