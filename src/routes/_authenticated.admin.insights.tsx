@@ -7,6 +7,13 @@ import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -14,6 +21,39 @@ import {
   generateInsightsReport,
   generateDeepInsights,
 } from "@/lib/analytics.functions";
+
+type Week = { value: string; label: string; from: string; to: string };
+
+function buildWeeks(count = 12): Week[] {
+  const weeks: Week[] = [];
+  const now = new Date();
+  // Find Monday of current week
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const diffToMon = (day + 6) % 7;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMon);
+  for (let i = 0; i < count; i++) {
+    const from = new Date(monday);
+    from.setDate(monday.getDate() - i * 7);
+    const to = new Date(from);
+    to.setDate(from.getDate() + 7);
+    const fmt = (d: Date) =>
+      d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const endLabel = new Date(to);
+    endLabel.setDate(to.getDate() - 1);
+    weeks.push({
+      value: from.toISOString().slice(0, 10),
+      label:
+        i === 0
+          ? `This week (${fmt(from)} – ${fmt(endLabel)})`
+          : i === 1
+            ? `Last week (${fmt(from)} – ${fmt(endLabel)})`
+            : `${fmt(from)} – ${fmt(endLabel)}`,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+  }
+  return weeks;
+}
 
 export const Route = createFileRoute("/_authenticated/admin/insights")({
   head: () => ({ meta: [{ title: "Insights — OpsAssist" }] }),
@@ -38,16 +78,18 @@ function InsightsPage() {
   const [loadingReport, setLoadingReport] = useState(true);
   const [loadingDeep, setLoadingDeep] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const weeks = useState<Week[]>(() => buildWeeks(12))[0];
+  const [weekValue, setWeekValue] = useState<string>("all");
 
   const isSuperAdmin = department === null;
   const scopeLabel = isSuperAdmin ? "All Departments" : `${department}`;
 
-  async function loadAll() {
+  async function loadAll(range: { from?: string; to?: string }) {
     setLoadingAnalytics(true);
     setLoadingReport(true);
     setLoadingDeep(true);
     try {
-      const a = await fetchAnalytics();
+      const a = await fetchAnalytics({ data: range });
       setAnalytics(a);
     } catch (e) {
       console.error("[insights] analytics failed", e);
@@ -55,7 +97,7 @@ function InsightsPage() {
       setLoadingAnalytics(false);
     }
     try {
-      const r = await fetchInsights();
+      const r = await fetchInsights({ data: range });
       setReport(r);
     } catch (e) {
       console.error("[insights] report failed", e);
@@ -63,7 +105,7 @@ function InsightsPage() {
       setLoadingReport(false);
     }
     try {
-      const d = await fetchDeep();
+      const d = await fetchDeep({ data: range });
       setDeep(d);
     } catch (e) {
       console.error("[insights] deep failed", e);
@@ -72,10 +114,15 @@ function InsightsPage() {
     }
   }
 
+  function currentRange(): { from?: string; to?: string } {
+    const w = weeks.find((x) => x.value === weekValue);
+    return w ? { from: w.from, to: w.to } : {};
+  }
+
   useEffect(() => {
-    loadAll();
+    loadAll(currentRange());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [weekValue]);
 
   async function handleDownload() {
     if (!report) return;
@@ -176,10 +223,23 @@ function InsightsPage() {
             >
               <ArrowLeft size={14} className="mr-1.5" /> Back
             </Button>
+            <Select value={weekValue} onValueChange={setWeekValue}>
+              <SelectTrigger className="h-8 w-[220px] rounded-lg text-xs">
+                <SelectValue placeholder="Select week" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                {weeks.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>
+                    {w.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
-              onClick={loadAll}
+              onClick={() => loadAll(currentRange())}
               disabled={loadingAnalytics || loadingReport}
               className="rounded-lg"
             >
