@@ -276,9 +276,6 @@ function InsightsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Insights
-            </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight">
               {scopeLabel} dashboard
             </h1>
