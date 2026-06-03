@@ -223,10 +223,23 @@ function InsightsPage() {
             >
               <ArrowLeft size={14} className="mr-1.5" /> Back
             </Button>
+            <Select value={weekValue} onValueChange={setWeekValue}>
+              <SelectTrigger className="h-8 w-[220px] rounded-lg text-xs">
+                <SelectValue placeholder="Select week" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                {weeks.map((w) => (
+                  <SelectItem key={w.value} value={w.value}>
+                    {w.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
-              onClick={loadAll}
+              onClick={() => loadAll(currentRange())}
               disabled={loadingAnalytics || loadingReport}
               className="rounded-lg"
             >
