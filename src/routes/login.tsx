@@ -1,13 +1,18 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { activateAccount, resolveLoginEmail } from "@/lib/users.functions";
+import {
+  activateAccount,
+  confirmPasswordReset,
+  requestPasswordReset,
+  resolveLoginEmail,
+} from "@/lib/users.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, LogIn, UserPlus, ArrowLeft } from "lucide-react";
+import { Loader2, LogIn, UserPlus, ArrowLeft, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — OpsAssist" }] }),
