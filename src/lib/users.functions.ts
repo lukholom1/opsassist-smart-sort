@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
-import { sendOtpEmail } from "./email.server";
+import { sendOtpEmail, sendPasswordResetEmail } from "./email.server";
 
 const ROLES = ["admin", "employee"] as const;
 const DEPTS = ["HR", "IT", "Finance", "Operations"] as const;
@@ -197,6 +197,74 @@ export const activateAccount = createServerFn({ method: "POST" })
       .from("pending_activations")
       .update({ used_at: new Date().toISOString() })
       .eq("id", pending.id);
+
+    return { ok: true, email };
+  });
+
+// ---- Public: request a password reset OTP (sent via email) ----
+const RequestResetSchema = z.object({ email: z.string().trim().min(3).max(120) });
+
+export const requestPasswordReset = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => RequestResetSchema.parse(input))
+  .handler(async ({ data }) => {
+    const email = normalizeEmail(data.email);
+
+    // Only issue codes for users that actually exist — but always return ok
+    // to avoid leaking which emails are registered.
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const exists = existingUsers.users.some((u) => u.email === email);
+
+    if (exists) {
+      const otp = generateOtp();
+      const { error } = await supabaseAdmin.from("password_resets").insert({
+        email,
+        otp_code: otp,
+      });
+      if (error) throw new Error(error.message);
+      await sendPasswordResetEmail({ to: email, otp });
+    }
+
+    return { ok: true };
+  });
+
+// ---- Public: confirm OTP and set a new password ----
+const ConfirmResetSchema = z.object({
+  email: z.string().trim().min(3).max(120),
+  otp: z.string().trim().length(6),
+  password: z.string().min(8).max(72),
+});
+
+export const confirmPasswordReset = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => ConfirmResetSchema.parse(input))
+  .handler(async ({ data }) => {
+    const email = normalizeEmail(data.email);
+
+    const { data: reset, error: fetchErr } = await supabaseAdmin
+      .from("password_resets")
+      .select("*")
+      .eq("email", email)
+      .eq("otp_code", data.otp)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (fetchErr) throw new Error(fetchErr.message);
+    if (!reset) throw new Error("Invalid or expired code.");
+
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const user = existingUsers.users.find((u) => u.email === email);
+    if (!user) throw new Error("No account found for that email.");
+
+    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      password: data.password,
+    });
+    if (updateErr) throw new Error(updateErr.message);
+
+    await supabaseAdmin
+      .from("password_resets")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", reset.id);
 
     return { ok: true, email };
   });

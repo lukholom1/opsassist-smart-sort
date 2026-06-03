@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      password_resets: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          otp_code: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          otp_code: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          otp_code?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       pending_activations: {
         Row: {
           created_at: string
