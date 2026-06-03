@@ -189,10 +189,22 @@ function InsightsPage() {
             >
               <ArrowLeft size={14} className="mr-1.5" /> Back
             </Button>
+            <Select value={rangeKey} onValueChange={setRangeKey}>
+              <SelectTrigger className="h-8 w-[180px] rounded-lg text-xs">
+                <SelectValue placeholder="Select range" />
+              </SelectTrigger>
+              <SelectContent>
+                {rangeOptions.map((o) => (
+                  <SelectItem key={o.key} value={o.key} className="text-xs">
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
-              onClick={loadAll}
+              onClick={() => loadAll(currentRange)}
               disabled={loadingAnalytics || loadingReport}
               className="rounded-lg"
             >
