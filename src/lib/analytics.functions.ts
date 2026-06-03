@@ -169,9 +169,10 @@ export const getAdminAnalytics = createServerFn({ method: "POST" })
 // ---- AI insights report ----
 export const generateInsightsReport = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }) => {
+  .inputValidator(parseRange)
+  .handler(async ({ context, data }) => {
     const dept = (context.department ?? null) as Department | null;
-    const tickets = await scopedTickets(dept);
+    const tickets = await scopedTickets(dept, data);
     const ids = tickets.map((t) => t.id);
 
     const { data: feedback } = ids.length
