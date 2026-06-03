@@ -256,6 +256,26 @@ function InsightsPage() {
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Insights
+              </p>
+              <Select value={weekValue} onValueChange={setWeekValue}>
+                <SelectTrigger
+                  className="h-8 w-[240px] rounded-full border-0 bg-gradient-to-r from-purple-accent to-soft-blue px-4 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:opacity-90 focus:ring-2 focus:ring-purple-accent/50 [&>svg]:text-primary-foreground [&>svg]:opacity-100"
+                >
+                  <SelectValue placeholder="Select week" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All time</SelectItem>
+                  {weeks.map((w) => (
+                    <SelectItem key={w.value} value={w.value}>
+                      {w.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Insights
             </p>
