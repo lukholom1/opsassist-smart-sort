@@ -31,13 +31,31 @@ export function businessMinutesBetween(fromIso: string | null, toIso: string | n
 
 type Department = "HR" | "IT" | "Finance" | "Operations";
 
-async function scopedTickets(dept: Department | null) {
+export type DateRange = { from?: string; to?: string };
+
+function parseRange(input: unknown): DateRange {
+  const r = (input ?? {}) as DateRange;
+  const out: DateRange = {};
+  if (typeof r.from === "string" && r.from) out.from = r.from;
+  if (typeof r.to === "string" && r.to) out.to = r.to;
+  return out;
+}
+
+function rangeLabel(r: DateRange): string {
+  if (!r.from && !r.to) return "";
+  const fmt = (s?: string) => (s ? new Date(s).toISOString().slice(0, 10) : "…");
+  return ` (${fmt(r.from)} → ${fmt(r.to)})`;
+}
+
+async function scopedTickets(dept: Department | null, range: DateRange = {}) {
   let q = supabaseAdmin
     .from("tickets")
     .select("id, created_at, resolved_at, priority, categories, status, resolved_by_ai")
     .order("created_at", { ascending: false })
     .limit(2000);
   if (dept) q = q.contains("categories", [dept]);
+  if (range.from) q = q.gte("created_at", range.from);
+  if (range.to) q = q.lt("created_at", range.to);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return data ?? [];
