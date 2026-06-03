@@ -304,7 +304,8 @@ type DeepInsights = {
 
 export const generateDeepInsights = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }): Promise<DeepInsights> => {
+  .inputValidator((input: unknown) => parseRange(input))
+  .handler(async ({ context, data: range }): Promise<DeepInsights> => {
     const dept = (context.department ?? null) as Department | null;
 
     let q = supabaseAdmin
@@ -313,6 +314,8 @@ export const generateDeepInsights = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(500);
     if (dept) q = q.contains("categories", [dept]);
+    if (range.from) q = q.gte("created_at", range.from);
+    if (range.to) q = q.lt("created_at", range.to);
     const { data: tickets, error } = await q;
     if (error) throw new Error(error.message);
     const rows = tickets ?? [];
