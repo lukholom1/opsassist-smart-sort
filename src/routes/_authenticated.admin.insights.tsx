@@ -518,3 +518,31 @@ function Mini({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+type RangeOption = { key: string; label: string; range: AnalyticsRange };
+
+function buildRangeOptions(): RangeOption[] {
+  const opts: RangeOption[] = [{ key: "all", label: "All time", range: {} }];
+  const now = new Date();
+  // Find Monday of this week (treat Sunday as day 7)
+  const day = (now.getDay() + 6) % 7; // 0 = Monday
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+  for (let i = 0; i < 6; i++) {
+    const start = new Date(monday);
+    start.setDate(monday.getDate() - i * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    const label =
+      i === 0
+        ? "This week"
+        : i === 1
+          ? "Last week"
+          : `Week of ${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    opts.push({
+      key: `week-${i}`,
+      label,
+      range: { from: start.toISOString(), to: end.toISOString(), label },
+    });
+  }
+  return opts;
+}
