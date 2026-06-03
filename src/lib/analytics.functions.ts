@@ -379,7 +379,7 @@ export const generateDeepInsights = createServerFn({ method: "POST" })
         .map((n) => n.body.slice(0, 200)),
     }));
 
-    const scope = dept ?? "All Departments (Super Admin)";
+    const scope = (dept ?? "All Departments (Super Admin)") + rangeLabel(range);
     const fallback: DeepInsights = {
       scope,
       generated_at: new Date().toISOString(),
