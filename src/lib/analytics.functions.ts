@@ -197,7 +197,7 @@ export const generateInsightsReport = createServerFn({ method: "POST" })
       : 0;
 
     const summary = {
-      scope: dept ?? "All Departments (Super Admin)",
+      scope: `${dept ?? "All Departments (Super Admin)"}${data?.label ? ` · ${data.label}` : ""}`,
       generated_at: new Date().toISOString(),
       total_tickets: total,
       resolved,
