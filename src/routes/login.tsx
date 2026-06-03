@@ -201,8 +201,13 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
       <form onSubmit={submit} className="grid gap-4">
         <div className="grid gap-2">
           <Label>Email</Label>
-          <p className="text-xs text-muted-foreground">Enter the email address your admin registered for you.</p>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="e.g. jane.doe@company.com"
+            required
+          />
         </div>
         <div className="grid gap-2">
           <Label>Activation code</Label>
