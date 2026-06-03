@@ -31,23 +31,37 @@ export function businessMinutesBetween(fromIso: string | null, toIso: string | n
 
 type Department = "HR" | "IT" | "Finance" | "Operations";
 
-async function scopedTickets(dept: Department | null) {
+export type AnalyticsRange = { from?: string; to?: string; label?: string };
+
+function parseRange(input: unknown): AnalyticsRange {
+  const r = (input ?? {}) as AnalyticsRange;
+  return {
+    from: typeof r.from === "string" ? r.from : undefined,
+    to: typeof r.to === "string" ? r.to : undefined,
+    label: typeof r.label === "string" ? r.label : undefined,
+  };
+}
+
+async function scopedTickets(dept: Department | null, range?: AnalyticsRange) {
   let q = supabaseAdmin
     .from("tickets")
     .select("id, created_at, resolved_at, priority, categories, status, resolved_by_ai")
     .order("created_at", { ascending: false })
     .limit(2000);
   if (dept) q = q.contains("categories", [dept]);
+  if (range?.from) q = q.gte("created_at", range.from);
+  if (range?.to) q = q.lte("created_at", range.to);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return data ?? [];
 }
 
-export const getAdminAnalytics = createServerFn({ method: "GET" })
+export const getAdminAnalytics = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }) => {
+  .inputValidator(parseRange)
+  .handler(async ({ context, data }) => {
     const dept = (context.department ?? null) as Department | null;
-    const tickets = await scopedTickets(dept);
+    const tickets = await scopedTickets(dept, data);
     const ids = tickets.map((t) => t.id);
 
     // Notes for response calculations
@@ -155,9 +169,10 @@ export const getAdminAnalytics = createServerFn({ method: "GET" })
 // ---- AI insights report ----
 export const generateInsightsReport = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }) => {
+  .inputValidator(parseRange)
+  .handler(async ({ context, data }) => {
     const dept = (context.department ?? null) as Department | null;
-    const tickets = await scopedTickets(dept);
+    const tickets = await scopedTickets(dept, data);
     const ids = tickets.map((t) => t.id);
 
     const { data: feedback } = ids.length
@@ -182,7 +197,7 @@ export const generateInsightsReport = createServerFn({ method: "POST" })
       : 0;
 
     const summary = {
-      scope: dept ?? "All Departments (Super Admin)",
+      scope: `${dept ?? "All Departments (Super Admin)"}${data?.label ? ` · ${data.label}` : ""}`,
       generated_at: new Date().toISOString(),
       total_tickets: total,
       resolved,
@@ -283,7 +298,8 @@ type DeepInsights = {
 
 export const generateDeepInsights = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
-  .handler(async ({ context }): Promise<DeepInsights> => {
+  .inputValidator(parseRange)
+  .handler(async ({ context, data }): Promise<DeepInsights> => {
     const dept = (context.department ?? null) as Department | null;
 
     let q = supabaseAdmin
@@ -292,6 +308,8 @@ export const generateDeepInsights = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(500);
     if (dept) q = q.contains("categories", [dept]);
+    if (data?.from) q = q.gte("created_at", data.from);
+    if (data?.to) q = q.lte("created_at", data.to);
     const { data: tickets, error } = await q;
     if (error) throw new Error(error.message);
     const rows = tickets ?? [];
@@ -355,7 +373,7 @@ export const generateDeepInsights = createServerFn({ method: "POST" })
         .map((n) => n.body.slice(0, 200)),
     }));
 
-    const scope = dept ?? "All Departments (Super Admin)";
+    const scope = `${dept ?? "All Departments (Super Admin)"}${data?.label ? ` · ${data.label}` : ""}`;
     const fallback: DeepInsights = {
       scope,
       generated_at: new Date().toISOString(),
