@@ -27,7 +27,7 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-type Mode = "signin" | "activate";
+type Mode = "signin" | "activate" | "forgot";
 
 function LoginPage() {
   const { admin } = Route.useSearch();
@@ -39,11 +39,15 @@ function LoginPage() {
           <Logo size="lg" />
         </div>
         <div className="rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-soft)]">
-          {mode === "signin" ? (
-            <SignInForm onSwitch={() => setMode("activate")} isAdmin={admin === 1} />
-          ) : (
-            <ActivateForm onSwitch={() => setMode("signin")} />
+          {mode === "signin" && (
+            <SignInForm
+              onActivate={() => setMode("activate")}
+              onForgot={() => setMode("forgot")}
+              isAdmin={admin === 1}
+            />
           )}
+          {mode === "activate" && <ActivateForm onSwitch={() => setMode("signin")} />}
+          {mode === "forgot" && <ForgotPasswordForm onSwitch={() => setMode("signin")} />}
         </div>
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Built by <span className="font-semibold text-foreground">BYTEBUILDERS</span>
