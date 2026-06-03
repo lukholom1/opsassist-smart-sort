@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
-import { sendOtpEmail } from "./email.server";
+import { sendOtpEmail, sendPasswordResetEmail } from "./email.server";
 
 const ROLES = ["admin", "employee"] as const;
 const DEPTS = ["HR", "IT", "Finance", "Operations"] as const;
