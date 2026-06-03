@@ -7,12 +7,20 @@ import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench
 import { Logo } from "@/components/Logo";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getAdminAnalytics,
   generateInsightsReport,
   generateDeepInsights,
+  type AnalyticsRange,
 } from "@/lib/analytics.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/insights")({
