@@ -31,13 +31,26 @@ export function businessMinutesBetween(fromIso: string | null, toIso: string | n
 
 type Department = "HR" | "IT" | "Finance" | "Operations";
 
-async function scopedTickets(dept: Department | null) {
+export type AnalyticsRange = { from?: string; to?: string; label?: string };
+
+function parseRange(input: unknown): AnalyticsRange {
+  const r = (input ?? {}) as AnalyticsRange;
+  return {
+    from: typeof r.from === "string" ? r.from : undefined,
+    to: typeof r.to === "string" ? r.to : undefined,
+    label: typeof r.label === "string" ? r.label : undefined,
+  };
+}
+
+async function scopedTickets(dept: Department | null, range?: AnalyticsRange) {
   let q = supabaseAdmin
     .from("tickets")
     .select("id, created_at, resolved_at, priority, categories, status, resolved_by_ai")
     .order("created_at", { ascending: false })
     .limit(2000);
   if (dept) q = q.contains("categories", [dept]);
+  if (range?.from) q = q.gte("created_at", range.from);
+  if (range?.to) q = q.lte("created_at", range.to);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return data ?? [];
