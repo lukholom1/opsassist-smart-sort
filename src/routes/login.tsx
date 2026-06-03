@@ -174,7 +174,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
       </div>
       <form onSubmit={submit} className="grid gap-4">
         <div className="grid gap-2">
-          <Label>Email or username</Label>
+          <Label>Email</Label>
           <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div className="grid gap-2">
