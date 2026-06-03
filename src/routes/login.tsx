@@ -175,6 +175,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
       <form onSubmit={submit} className="grid gap-4">
         <div className="grid gap-2">
           <Label>Email</Label>
+          <p className="text-xs text-muted-foreground">Enter the email address your admin registered for you.</p>
           <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div className="grid gap-2">
@@ -189,7 +190,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
           />
         </div>
         <div className="grid gap-2">
-          <Label>Choose a username</Label>
+          <Label>Create username</Label>
           <Input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -202,7 +203,7 @@ function ActivateForm({ onSwitch }: { onSwitch: () => void }) {
           <p className="text-xs text-muted-foreground">3–30 chars: letters, numbers, . _ -</p>
         </div>
         <div className="grid gap-2">
-          <Label>Choose a password</Label>
+          <Label>Create password</Label>
           <Input
             type="password"
             value={password}
