@@ -264,21 +264,14 @@ function Landing() {
               Ready to streamline your support?
             </h2>
             <p className="relative z-10 mx-auto mt-4 max-w-lg text-muted-foreground">
-              Get started in minutes. Sign in as a user or admin to experience AI-powered ticketing.
+              Get started in minutes. Sign in to experience AI-powered ticketing.
             </p>
             <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-4">
               <Link
                 to="/login"
                 className="inline-flex h-12 items-center gap-2 rounded-xl bg-[image:var(--gradient-hero)] px-7 font-semibold text-white shadow-[var(--shadow-glow)] transition hover:brightness-110"
               >
-                <LogIn size={18} /> User sign in
-              </Link>
-              <Link
-                to="/login"
-                search={{ admin: 1 } as never}
-                className="inline-flex h-12 items-center gap-2 rounded-xl border border-border bg-card px-7 font-semibold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-              >
-                <ShieldCheck size={18} /> Admin sign in
+                <LogIn size={18} /> Sign in
               </Link>
             </div>
           </div>
