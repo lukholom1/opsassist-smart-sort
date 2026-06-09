@@ -16,9 +16,6 @@ import { Loader2, LogIn, UserPlus, ArrowLeft, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — OpsAssist" }] }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    admin: search.admin === 1 || search.admin === "1" ? 1 : undefined,
-  }),
   // If already signed in, send them to the index router.
   beforeLoad: async () => {
     const { data } = await supabase.auth.getSession();
@@ -30,7 +27,6 @@ export const Route = createFileRoute("/login")({
 type Mode = "signin" | "activate" | "forgot";
 
 function LoginPage() {
-  const { admin } = Route.useSearch();
   const [mode, setMode] = useState<Mode>("signin");
   return (
     <div className="grid min-h-screen place-items-center px-6 py-12">
@@ -43,7 +39,6 @@ function LoginPage() {
             <SignInForm
               onActivate={() => setMode("activate")}
               onForgot={() => setMode("forgot")}
-              isAdmin={admin === 1}
             />
           )}
           {mode === "activate" && <ActivateForm onSwitch={() => setMode("signin")} />}
