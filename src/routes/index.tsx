@@ -1,23 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
-
-import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
-import {
-  Sparkles,
-  LogIn,
-  
-  Zap,
-  BrainCircuit,
-  BarChart3,
-  MessageSquare,
-  TicketCheck,
-  Clock,
-  Users,
-  Layers,
-  ArrowRight,
-} from "lucide-react";
+import { LogIn } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
