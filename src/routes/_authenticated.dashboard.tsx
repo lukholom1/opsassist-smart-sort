@@ -236,7 +236,6 @@ function DashboardPage() {
           )}
         </div>
       </main>
-      <Footer />
 
       {showForm && (
         <NewTicketDialog
