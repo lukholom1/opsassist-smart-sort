@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import {
   Sparkles,
   LogIn,
-  ShieldCheck,
+  
   Zap,
   BrainCircuit,
   BarChart3,
@@ -116,16 +116,9 @@ function Landing() {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="hidden text-sm font-medium text-muted-foreground transition hover:text-foreground sm:inline-flex"
+            className="inline-flex items-center gap-2 rounded-xl bg-[image:var(--gradient-hero)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-glow)] transition hover:brightness-110"
           >
-            User sign in
-          </Link>
-          <Link
-            to="/login"
-            search={{ admin: 1 } as never}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-          >
-            <ShieldCheck size={14} /> Admin sign in
+            <LogIn size={14} /> Sign in
           </Link>
         </div>
       </header>
@@ -154,14 +147,7 @@ function Landing() {
               to="/login"
               className="inline-flex h-14 items-center gap-2 rounded-2xl bg-[image:var(--gradient-hero)] px-8 text-base font-semibold text-white shadow-[var(--shadow-glow)] transition-all hover:brightness-110 hover:shadow-lg"
             >
-              <LogIn size={18} /> Sign in as User <ArrowRight size={16} />
-            </Link>
-            <Link
-              to="/login"
-              search={{ admin: 1 } as never}
-              className="inline-flex h-14 items-center gap-2 rounded-2xl border border-primary/30 bg-card px-8 text-base font-semibold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-            >
-              <ShieldCheck size={18} /> Sign in as Admin
+              <LogIn size={18} /> Sign in <ArrowRight size={16} />
             </Link>
           </div>
 
@@ -278,21 +264,14 @@ function Landing() {
               Ready to streamline your support?
             </h2>
             <p className="relative z-10 mx-auto mt-4 max-w-lg text-muted-foreground">
-              Get started in minutes. Sign in as a user or admin to experience AI-powered ticketing.
+              Get started in minutes. Sign in to experience AI-powered ticketing.
             </p>
             <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-4">
               <Link
                 to="/login"
                 className="inline-flex h-12 items-center gap-2 rounded-xl bg-[image:var(--gradient-hero)] px-7 font-semibold text-white shadow-[var(--shadow-glow)] transition hover:brightness-110"
               >
-                <LogIn size={18} /> User sign in
-              </Link>
-              <Link
-                to="/login"
-                search={{ admin: 1 } as never}
-                className="inline-flex h-12 items-center gap-2 rounded-xl border border-border bg-card px-7 font-semibold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-              >
-                <ShieldCheck size={18} /> Admin sign in
+                <LogIn size={18} /> Sign in
               </Link>
             </div>
           </div>

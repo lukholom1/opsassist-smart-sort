@@ -76,7 +76,10 @@ function AdminRoute() {
 
 function AdminPage() {
   const navigate = useNavigate();
-  const { signOut, fullName, department } = useAuth();
+  const { signOut, fullName, department, role } = useAuth();
+  useEffect(() => {
+    if (role && role !== "admin") navigate({ to: "/dashboard", replace: true });
+  }, [role, navigate]);
   const fetchTickets = useServerFn(listDeptTickets);
   const updateStatus = useServerFn(updateAssignmentStatus);
 

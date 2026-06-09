@@ -16,9 +16,6 @@ import { Loader2, LogIn, UserPlus, ArrowLeft, KeyRound } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — OpsAssist" }] }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    admin: search.admin === 1 || search.admin === "1" ? 1 : undefined,
-  }),
   // If already signed in, send them to the index router.
   beforeLoad: async () => {
     const { data } = await supabase.auth.getSession();
@@ -30,7 +27,6 @@ export const Route = createFileRoute("/login")({
 type Mode = "signin" | "activate" | "forgot";
 
 function LoginPage() {
-  const { admin } = Route.useSearch();
   const [mode, setMode] = useState<Mode>("signin");
   return (
     <div className="grid min-h-screen place-items-center px-6 py-12">
@@ -43,7 +39,6 @@ function LoginPage() {
             <SignInForm
               onActivate={() => setMode("activate")}
               onForgot={() => setMode("forgot")}
-              isAdmin={admin === 1}
             />
           )}
           {mode === "activate" && <ActivateForm onSwitch={() => setMode("signin")} />}
@@ -65,15 +60,13 @@ function normalizeEmail(input: string) {
 function SignInForm({
   onActivate,
   onForgot,
-  isAdmin = false,
 }: {
   onActivate: () => void;
   onForgot: () => void;
-  isAdmin?: boolean;
 }) {
   const navigate = useNavigate();
   const resolve = useServerFn(resolveLoginEmail);
-  const [identifier, setIdentifier] = useState(isAdmin ? "Admin" : "");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +82,7 @@ function SignInForm({
         setError("Invalid credentials. Try again.");
         return;
       }
-      navigate({ to: isAdmin ? "/admin" : "/" });
+      navigate({ to: "/" });
     } catch {
       setError("Invalid credentials. Try again.");
     } finally {
@@ -109,7 +102,7 @@ function SignInForm({
           <Input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="Admin or you@company.com"
+            placeholder="you@company.com"
             autoFocus
             required
           />
@@ -133,7 +126,7 @@ function SignInForm({
           className="h-11 rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-          {isAdmin ? "Sign in" : "User sign in"}
+          Sign in
         </Button>
       </form>
       <div className="mt-4 grid gap-2">
