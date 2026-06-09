@@ -105,6 +105,103 @@ function AdminPage() {
 }
 
 
+type Analytics = Awaited<ReturnType<typeof getAdminAnalytics>>;
+
+function TicketAnalyticsSection() {
+  const fetchAnalytics = useServerFn(getAdminAnalytics);
+  const [data, setData] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetchAnalytics({ data: {} })
+      .then((a) => {
+        if (active) setData(a);
+      })
+      .catch((e) => console.error("[admin] analytics failed", e))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [fetchAnalytics]);
+
+  const t = data?.totals;
+  const avgHandling = data?.handling.find((h) => h.metric === "Resolution")?.minutes ?? 0;
+
+  return (
+    <section className="mt-8">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Total tickets" value={t?.tickets ?? "—"} icon={<TrendingUp size={14} />} tone="blue" />
+        <Kpi label="Resolved" value={t?.resolved ?? "—"} icon={<CheckCircle2 size={14} />} tone="success" />
+        <Kpi label="Resolved by AI" value={t?.byAi ?? "—"} icon={<Sparkles size={14} />} tone="purple" />
+        <Kpi label="Avg rating" value={t?.avgRating ? `${t.avgRating}/5` : "—"} icon={<Star size={14} />} tone="warning" />
+      </div>
+
+      <div className="mt-2 text-xs text-muted-foreground">
+        Average business-hours resolution: <span className="font-medium text-foreground">{avgHandling} min</span>
+      </div>
+
+      <div className="mt-4">
+        {loading && !data ? (
+          <div className="flex h-[280px] items-center justify-center rounded-3xl border border-dashed border-border text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading ticket analytics…
+          </div>
+        ) : data ? (
+          <div className="-mx-6">
+            <AdminCharts data={data} />
+          </div>
+        ) : (
+          <div className="flex h-[200px] items-center justify-center rounded-3xl border border-dashed border-border text-sm text-muted-foreground">
+            No analytics available yet.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Kpi({
+  label,
+  value,
+  icon,
+  tone = "blue",
+}: {
+  label: string;
+  value: React.ReactNode;
+  icon?: React.ReactNode;
+  tone?: "blue" | "success" | "purple" | "warning";
+}) {
+  const toneRing =
+    tone === "success"
+      ? "from-success/20 to-transparent"
+      : tone === "purple"
+        ? "from-purple-accent/25 to-transparent"
+        : tone === "warning"
+          ? "from-warning/25 to-transparent"
+          : "from-soft-blue/25 to-transparent";
+  const toneText =
+    tone === "success"
+      ? "text-success"
+      : tone === "purple"
+        ? "text-purple-accent"
+        : tone === "warning"
+          ? "text-warning"
+          : "text-soft-blue";
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/80 p-4 shadow-[var(--shadow-soft)] backdrop-blur-sm">
+      <div className={`pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-br ${toneRing} blur-2xl`} />
+      <div className="relative flex items-center gap-2">
+        <span className={toneText}>{icon}</span>
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+      </div>
+      <p className="relative mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+    </div>
+  );
+}
+
 
 
 function UsersDialog({ onClose }: { onClose: () => void }) {
