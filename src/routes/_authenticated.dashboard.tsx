@@ -197,10 +197,10 @@ function DashboardPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setNotesTicket(t)}
+                      onClick={() => setChatTicket(t)}
                       className="relative rounded-full"
                     >
-                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Notes
+                      <Bot size={14} className="mr-1.5 text-purple-accent" /> Chatbot
                       {unreadCount > 0 && (
                         <span
                           className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
@@ -210,16 +210,6 @@ function DashboardPage() {
                         </span>
                       )}
                     </Button>
-                    {t.status !== "Resolved" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAiTicket(t)}
-                        className="rounded-full"
-                      >
-                        <Sparkles size={14} className="mr-1.5 text-purple-accent" /> AI support
-                      </Button>
-                    )}
                     {t.status === "Resolved" && !t.feedback && (
                       <Button
                         size="sm"
@@ -230,6 +220,7 @@ function DashboardPage() {
                       </Button>
                     )}
                   </div>
+
                 </div>
               </div>
               );
