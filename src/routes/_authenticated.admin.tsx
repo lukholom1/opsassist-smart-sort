@@ -8,6 +8,8 @@ import {
   listUsers,
   reclassifyUser,
 } from "@/lib/users.functions";
+import { getAdminAnalytics } from "@/lib/analytics.functions";
+import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 
@@ -28,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck } from "lucide-react";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -92,9 +94,10 @@ function AdminPage() {
           {isSuperAdmin ? "Admin dashboard" : `${department} dashboard`}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Open <span className="font-medium text-foreground">Tickets</span> to manage active and resolved requests, or
-          jump to <span className="font-medium text-foreground">Insights</span> for analytics.
+          A live snapshot of ticket activity. Open <span className="font-medium text-foreground">Tickets</span> to manage requests, or jump to <span className="font-medium text-foreground">Insights</span> for the full report.
         </p>
+
+        <TicketAnalyticsSection />
       </main>
       {showUsers && <UsersDialog onClose={() => setShowUsers(false)} />}
     </div>
