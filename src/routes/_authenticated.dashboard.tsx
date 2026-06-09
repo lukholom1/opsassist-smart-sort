@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot, MessageSquare } from "lucide-react";
+import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
