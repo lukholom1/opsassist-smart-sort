@@ -211,6 +211,7 @@ async function fetchLatestNotesForTickets(ticketIds: string[]) {
     .from("ticket_notes")
     .select("ticket_id, author_role, created_at")
     .in("ticket_id", ticketIds)
+    .in("author_role", ["user", "admin"])
     .order("created_at", { ascending: false });
   for (const row of data ?? []) {
     if (!map.has(row.ticket_id)) {
