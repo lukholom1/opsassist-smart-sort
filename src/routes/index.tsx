@@ -116,16 +116,9 @@ function Landing() {
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="hidden text-sm font-medium text-muted-foreground transition hover:text-foreground sm:inline-flex"
+            className="inline-flex items-center gap-2 rounded-xl bg-[image:var(--gradient-hero)] px-4 py-2 text-sm font-semibold text-white shadow-[var(--shadow-glow)] transition hover:brightness-110"
           >
-            User sign in
-          </Link>
-          <Link
-            to="/login"
-            search={{ admin: 1 } as never}
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-          >
-            <ShieldCheck size={14} /> Admin sign in
+            <LogIn size={14} /> Sign in
           </Link>
         </div>
       </header>
