@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedItRouteImport } from './routes/_authenticated.it'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
+import { Route as AuthenticatedAdminTicketsRouteImport } from './routes/_authenticated.admin.tickets'
 import { Route as AuthenticatedAdminInsightsRouteImport } from './routes/_authenticated.admin.insights'
 
 const LoginRoute = LoginRouteImport.update({
@@ -46,6 +47,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminTicketsRoute =
+  AuthenticatedAdminTicketsRouteImport.update({
+    id: '/tickets',
+    path: '/tickets',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminInsightsRoute =
   AuthenticatedAdminInsightsRouteImport.update({
     id: '/insights',
@@ -60,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,6 +76,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,6 +87,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/it': typeof AuthenticatedItRoute
   '/_authenticated/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/_authenticated/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,8 +98,16 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/it'
     | '/admin/insights'
+    | '/admin/tickets'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/admin' | '/dashboard' | '/it' | '/admin/insights'
+  to:
+    | '/'
+    | '/login'
+    | '/admin'
+    | '/dashboard'
+    | '/it'
+    | '/admin/insights'
+    | '/admin/tickets'
   id:
     | '__root__'
     | '/'
@@ -99,6 +117,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/it'
     | '/_authenticated/admin/insights'
+    | '/_authenticated/admin/tickets'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -151,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/tickets': {
+      id: '/_authenticated/admin/tickets'
+      path: '/tickets'
+      fullPath: '/admin/tickets'
+      preLoaderRoute: typeof AuthenticatedAdminTicketsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/insights': {
       id: '/_authenticated/admin/insights'
       path: '/insights'
@@ -163,10 +189,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminInsightsRoute: typeof AuthenticatedAdminInsightsRoute
+  AuthenticatedAdminTicketsRoute: typeof AuthenticatedAdminTicketsRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminInsightsRoute: AuthenticatedAdminInsightsRoute,
+  AuthenticatedAdminTicketsRoute: AuthenticatedAdminTicketsRoute,
 }
 
 const AuthenticatedAdminRouteWithChildren =
