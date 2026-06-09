@@ -211,6 +211,7 @@ async function fetchLatestNotesForTickets(ticketIds: string[]) {
     .from("ticket_notes")
     .select("ticket_id, author_role, created_at")
     .in("ticket_id", ticketIds)
+    .in("author_role", ["user", "admin"])
     .order("created_at", { ascending: false });
   for (const row of data ?? []) {
     if (!map.has(row.ticket_id)) {
@@ -533,19 +534,47 @@ const GenerateResponseSchema = z.object({
   tone: z.enum(TONES).optional(),
 });
 
+const AI_AUTHOR_ID = "00000000-0000-0000-0000-000000000000";
+
+async function persistAiNoteIfFirst(ticketId: string, body: string) {
+  const { data: existing } = await supabaseAdmin
+    .from("ticket_notes")
+    .select("id")
+    .eq("ticket_id", ticketId)
+    .eq("author_role", "ai")
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+  await supabaseAdmin.from("ticket_notes").insert({
+    ticket_id: ticketId,
+    author_id: AI_AUTHOR_ID,
+    author_name: "AI Assistant",
+    author_role: "ai",
+    body,
+  });
+}
+
 export const generateTicketResponse = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => GenerateResponseSchema.parse(input))
   .handler(async ({ data }) => {
     const tone: Tone =
       data.tone ?? autoTone(data.categories, data.priority, `${data.title} ${data.details}`);
+
+    const finalize = async (response: string, source: "ai" | "template") => {
+      if (data.ticket_id) {
+        try {
+          await persistAiNoteIfFirst(data.ticket_id, response);
+        } catch {
+          /* ignore note persistence errors */
+        }
+      }
+      return { response, source, tone };
+    };
+
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) {
-      return {
-        response: templateResponse({ ...data, tone }),
-        source: "template" as const,
-        tone,
-      };
+      return finalize(templateResponse({ ...data, tone }), "template");
     }
 
     const behavior = data.categories.map((c) => DEPT_BEHAVIOR[c]).join(" ");
@@ -572,16 +601,156 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
           ],
         }),
       });
-      if (!res.ok)
-        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      if (!res.ok) return finalize(templateResponse({ ...data, tone }), "template");
       const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const content = json.choices?.[0]?.message?.content?.trim();
-      if (!content)
-        return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
-      return { response: content, source: "ai" as const, tone };
+      if (!content) return finalize(templateResponse({ ...data, tone }), "template");
+      return finalize(content, "ai");
     } catch {
-      return { response: templateResponse({ ...data, tone }), source: "template" as const, tone };
+      return finalize(templateResponse({ ...data, tone }), "template");
     }
+  });
+
+// ----------------------------- Ticket-aware Chatbot -----------------------------
+
+const AskBotSchema = z.object({
+  ticket_id: z.string().uuid(),
+  message: z.string().trim().min(1).max(2000),
+});
+
+export const askTicketBot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AskBotSchema.parse(input))
+  .handler(async ({ data, context }): Promise<{ reply: string }> => {
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("*")
+      .eq("id", data.ticket_id)
+      .maybeSingle();
+    if (!ticket) throw new Error("Ticket not found.");
+    if (ticket.user_id !== context.userId) throw new Error("Not your ticket.");
+    if (ticket.status === "Resolved")
+      throw new Error("This ticket is resolved — the conversation is closed.");
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const userName = profile?.full_name ?? "User";
+
+    await supabaseAdmin.from("ticket_notes").insert({
+      ticket_id: data.ticket_id,
+      author_id: context.userId,
+      author_name: userName,
+      author_role: "user",
+      body: data.message,
+    });
+
+    const [{ data: notes }, { data: assignments }] = await Promise.all([
+      supabaseAdmin
+        .from("ticket_notes")
+        .select("author_role, author_name, body, created_at")
+        .eq("ticket_id", data.ticket_id)
+        .order("created_at", { ascending: true }),
+      supabaseAdmin
+        .from("ticket_assignments")
+        .select("department, status, assigned_to, resolved_at")
+        .eq("ticket_id", data.ticket_id),
+    ]);
+
+    const assigneeIds = (assignments ?? [])
+      .map((a) => a.assigned_to)
+      .filter((v): v is string => !!v);
+    const nameById = new Map<string, string>();
+    if (assigneeIds.length) {
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", assigneeIds);
+      for (const p of profs ?? []) nameById.set(p.id, p.full_name ?? "Admin");
+    }
+
+    const assignmentLines = (assignments ?? [])
+      .map((a) => {
+        const who = a.assigned_to ? (nameById.get(a.assigned_to) ?? "Unassigned") : "Unassigned";
+        return `- ${a.department}: ${a.status} (assignee: ${who})`;
+      })
+      .join("\n");
+
+    const lastNote = (notes ?? []).filter((n) => n.author_role !== "user").slice(-1)[0];
+    const ticketContext = [
+      `Ticket ID: ${ticket.id}`,
+      `Title: ${ticket.title}`,
+      `Details: ${ticket.details}`,
+      `Status: ${ticket.status}`,
+      `Priority: ${ticket.priority}`,
+      `Categories: ${(ticket.categories ?? []).join(", ")}`,
+      `Created: ${new Date(ticket.created_at).toUTCString()}`,
+      ticket.resolved_at ? `Resolved at: ${new Date(ticket.resolved_at).toUTCString()}` : null,
+      ticket.resolved_by_ai ? `Resolved by AI: yes` : null,
+      assignmentLines ? `Department assignments:\n${assignmentLines}` : null,
+      lastNote ? `Last update: ${new Date(lastNote.created_at).toUTCString()} by ${lastNote.author_name}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const apiKey = process.env.LOVABLE_API_KEY;
+    let aiResponse: string;
+
+    if (!apiKey) {
+      aiResponse =
+        "I'm temporarily unable to respond. Your message has been recorded — an admin will follow up shortly.";
+    } else {
+      const system = [
+        "You are OpsAssist, a helpful support chatbot for an enterprise ticketing system.",
+        "You ONLY discuss the user's specific ticket and HR, IT, Finance, or Operations topics.",
+        "Use the ticket context below to answer questions about status, assignee, department, priority, dates, etc.",
+        "Be concise (under 120 words), warm, and professional. No markdown.",
+        "If the user asks to speak to a human or admin, tell them to use the 'Message Admin' option in the chatbot to reach their assigned administrator.",
+        "Never invent information that isn't in the ticket context.",
+        "",
+        "TICKET CONTEXT:",
+        ticketContext,
+      ].join("\n");
+
+      const history = (notes ?? []).slice(-20).map((n) => ({
+        role: n.author_role === "ai" ? ("assistant" as const) : ("user" as const),
+        content:
+          n.author_role === "admin"
+            ? `[Admin ${n.author_name}]: ${n.body}`
+            : n.body,
+      }));
+
+      try {
+        const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{ role: "system", content: system }, ...history],
+          }),
+        });
+        if (!res.ok) throw new Error("ai failed");
+        const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        aiResponse =
+          json.choices?.[0]?.message?.content?.trim() ||
+          "I couldn't generate a response. Please try again or message an admin.";
+      } catch {
+        aiResponse =
+          "I had trouble reaching the assistant. Please try again, or use 'Message Admin' to contact your assigned administrator.";
+      }
+    }
+
+    await supabaseAdmin.from("ticket_notes").insert({
+      ticket_id: data.ticket_id,
+      author_id: AI_AUTHOR_ID,
+      author_name: "AI Assistant",
+      author_role: "ai",
+      body: aiResponse,
+    });
+
+    return { reply: aiResponse };
   });
 
 // ----------------------------- Ticket conversation notes -----------------------------
@@ -591,7 +760,7 @@ export type TicketNote = {
   ticket_id: string;
   author_id: string;
   author_name: string;
-  author_role: "user" | "admin";
+  author_role: "user" | "admin" | "ai";
   body: string;
   created_at: string;
 };

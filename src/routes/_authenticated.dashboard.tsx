@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot, MessageSquare } from "lucide-react";
+import { Loader2, Sparkles, LogOut, CheckCircle2, Plus, X, Bot } from "lucide-react";
 import {
   elapsed,
   CategoryPills,
@@ -32,7 +32,8 @@ import {
   DepartmentStatusPills,
   RatingStars,
 } from "@/components/ticket-bits";
-import { NotesDialog } from "@/components/NotesDialog";
+// NotesDialog still used elsewhere; admin uses it directly. Chatbot replaces it for users.
+import { ChatbotDialog } from "@/components/ChatbotDialog";
 import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -68,11 +69,11 @@ function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [aiTicket, setAiTicket] = useState<Ticket | null>(null);
   const [rateTicket, setRateTicket] = useState<Ticket | null>(null);
-  const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
+  const [chatTicket, setChatTicket] = useState<Ticket | null>(null);
   const { counts: unreadCounts, clearTicket } = useNotesRealtime(
     "user",
     tickets,
-    notesTicket?.id ?? null,
+    chatTicket?.id ?? null,
   );
 
   async function refresh() {
@@ -196,10 +197,10 @@ function DashboardPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setNotesTicket(t)}
+                      onClick={() => setChatTicket(t)}
                       className="relative rounded-full"
                     >
-                      <MessageSquare size={14} className="mr-1.5 text-soft-blue" /> Notes
+                      <Bot size={14} className="mr-1.5 text-purple-accent" /> Chatbot
                       {unreadCount > 0 && (
                         <span
                           className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
@@ -209,16 +210,6 @@ function DashboardPage() {
                         </span>
                       )}
                     </Button>
-                    {t.status !== "Resolved" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAiTicket(t)}
-                        className="rounded-full"
-                      >
-                        <Sparkles size={14} className="mr-1.5 text-purple-accent" /> AI support
-                      </Button>
-                    )}
                     {t.status === "Resolved" && !t.feedback && (
                       <Button
                         size="sm"
@@ -229,6 +220,7 @@ function DashboardPage() {
                       </Button>
                     )}
                   </div>
+
                 </div>
               </div>
               );
@@ -271,15 +263,17 @@ function DashboardPage() {
           }}
         />
       )}
-      {notesTicket && (
-        <NotesDialog
-          ticketId={notesTicket.id}
-          ticketTitle={notesTicket.title}
-          viewerRole="user"
-          ticketResolved={notesTicket.status === "Resolved"}
+      {chatTicket && (
+        <ChatbotDialog
+          ticketId={chatTicket.id}
+          ticketTitle={chatTicket.title}
+          ticketResolved={chatTicket.status === "Resolved"}
+          assignedAdminName={
+            chatTicket.assignments.find((a) => a.assignee_name)?.assignee_name ?? null
+          }
           onClose={() => {
-            clearTicket(notesTicket.id);
-            setNotesTicket(null);
+            clearTicket(chatTicket.id);
+            setChatTicket(null);
             refresh();
           }}
         />

@@ -1,0 +1,2 @@
+ALTER TABLE public.ticket_notes DROP CONSTRAINT ticket_notes_author_role_check;
+ALTER TABLE public.ticket_notes ADD CONSTRAINT ticket_notes_author_role_check CHECK (author_role = ANY (ARRAY['user'::text, 'admin'::text, 'ai'::text]));

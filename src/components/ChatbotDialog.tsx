@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { addTicketNote, listTicketNotes, type TicketNote } from "@/lib/tickets.functions";
+import {
+  addTicketNote,
+  askTicketBot,
+  listTicketNotes,
+  type TicketNote,
+} from "@/lib/tickets.functions";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Loader2, Send, MessageSquare, Lock } from "lucide-react";
+import { Bot, Loader2, Lock, MessageSquare, Send, Sparkles, Users } from "lucide-react";
 
 function relTime(iso: string) {
   const d = new Date(iso);
@@ -21,37 +26,47 @@ function relTime(iso: string) {
   return d.toLocaleString();
 }
 
-export function NotesDialog({
+type Mode = "ai" | "admin";
+
+export function ChatbotDialog({
   ticketId,
   ticketTitle,
-  viewerRole,
   ticketResolved,
+  assignedAdminName,
   onClose,
 }: {
   ticketId: string;
   ticketTitle: string;
-  viewerRole: "user" | "admin";
   ticketResolved: boolean;
+  assignedAdminName?: string | null;
   onClose: () => void;
 }) {
   const listFn = useServerFn(listTicketNotes);
-  const addFn = useServerFn(addTicketNote);
+  const addNoteFn = useServerFn(addTicketNote);
+  const askBotFn = useServerFn(askTicketBot);
+
   const [notes, setNotes] = useState<TicketNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(ticketResolved);
+  const [mode, setMode] = useState<Mode>("ai");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [aiThinking, setAiThinking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [escalated, setEscalated] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   async function refresh() {
-    const r = await listFn({ data: { ticket_id: ticketId } });
-    setNotes(r.notes);
-    setLocked(r.locked);
-    setLoading(false);
-    queueMicrotask(() => {
-      scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight });
-    });
+    try {
+      const r = await listFn({ data: { ticket_id: ticketId } });
+      setNotes(r.notes);
+      setLocked(r.locked);
+    } finally {
+      setLoading(false);
+      queueMicrotask(() => {
+        scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight });
+      });
+    }
   }
 
   useEffect(() => {
@@ -63,17 +78,30 @@ export function NotesDialog({
 
   async function send() {
     if (!body.trim() || sending || locked) return;
+    const message = body.trim();
     setSending(true);
     setErr(null);
     try {
-      await addFn({ data: { ticket_id: ticketId, body: body.trim() } });
-      setBody("");
+      if (mode === "ai") {
+        setAiThinking(true);
+        setBody("");
+        await askBotFn({ data: { ticket_id: ticketId, message } });
+      } else {
+        await addNoteFn({ data: { ticket_id: ticketId, body: message } });
+        setBody("");
+      }
       await refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Failed to send.");
     } finally {
+      setAiThinking(false);
       setSending(false);
     }
+  }
+
+  function switchToAdmin() {
+    setMode("admin");
+    setEscalated(true);
   }
 
   return (
@@ -81,15 +109,39 @@ export function NotesDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageSquare size={18} className="text-soft-blue" />
-            {viewerRole === "user" ? "Note" : "Conversation"}
+            <Bot size={18} className="text-purple-accent" /> Chatbot
           </DialogTitle>
           <DialogDescription className="line-clamp-1">{ticketTitle}</DialogDescription>
         </DialogHeader>
 
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("ai")}
+            className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              mode === "ai"
+                ? "border-purple-accent/50 bg-purple-accent/15 text-purple-accent"
+                : "border-border bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Sparkles size={12} className="mr-1 inline" /> Ask AI
+          </button>
+          <button
+            type="button"
+            onClick={switchToAdmin}
+            className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              mode === "admin"
+                ? "border-soft-blue/50 bg-soft-blue/15 text-soft-blue"
+                : "border-border bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users size={12} className="mr-1 inline" /> Message Admin
+          </button>
+        </div>
+
         <div
           ref={scrollerRef}
-          className="max-h-[50vh] min-h-[200px] space-y-3 overflow-y-auto rounded-xl border border-border bg-muted/30 p-3"
+          className="max-h-[50vh] min-h-[240px] space-y-3 overflow-y-auto rounded-xl border border-border bg-muted/30 p-3"
         >
           {loading ? (
             <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
@@ -101,7 +153,7 @@ export function NotesDialog({
             </p>
           ) : (
             notes.map((n) => {
-              const mine = n.author_role === viewerRole;
+              const mine = n.author_role === "user";
               const isAdmin = n.author_role === "admin";
               const isAi = n.author_role === "ai";
               const initials = isAi
@@ -117,10 +169,10 @@ export function NotesDialog({
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ${
                     isAi
-                      ? "bg-warning/15 text-warning ring-warning/30"
+                      ? "bg-purple-accent/15 text-purple-accent ring-purple-accent/30"
                       : isAdmin
                         ? "bg-soft-blue/15 text-soft-blue ring-soft-blue/30"
-                        : "bg-purple-accent/15 text-purple-accent ring-purple-accent/30"
+                        : "bg-warning/15 text-warning ring-warning/30"
                   }`}
                   title={n.author_name}
                 >
@@ -139,13 +191,13 @@ export function NotesDialog({
                       <span
                         className={`rounded-full px-1.5 py-px text-[9px] font-medium ring-1 ring-inset ${
                           isAi
-                            ? "bg-warning/10 text-warning ring-warning/30"
+                            ? "bg-purple-accent/10 text-purple-accent ring-purple-accent/30"
                             : isAdmin
                               ? "bg-soft-blue/10 text-soft-blue ring-soft-blue/30"
-                              : "bg-purple-accent/10 text-purple-accent ring-purple-accent/30"
+                              : "bg-warning/10 text-warning ring-warning/30"
                         }`}
                       >
-                        {isAi ? "AI" : isAdmin ? "Support" : "User"}
+                        {isAi ? "AI" : isAdmin ? "Admin" : "You"}
                       </span>
                       <span>· {relTime(n.created_at)}</span>
                     </div>
@@ -154,10 +206,8 @@ export function NotesDialog({
                         mine
                           ? "rounded-br-sm bg-primary text-primary-foreground"
                           : isAi
-                            ? "rounded-bl-sm bg-warning/10 text-foreground ring-1 ring-warning/30"
-                            : isAdmin
-                              ? "rounded-bl-sm bg-soft-blue/10 text-foreground ring-1 ring-soft-blue/30"
-                              : "rounded-bl-sm bg-purple-accent/10 text-foreground ring-1 ring-purple-accent/30"
+                            ? "rounded-bl-sm bg-purple-accent/10 text-foreground ring-1 ring-purple-accent/30"
+                            : "rounded-bl-sm bg-soft-blue/10 text-foreground ring-1 ring-soft-blue/30"
                       }`}
                     >
                       <div className="whitespace-pre-wrap leading-relaxed">{n.body}</div>
@@ -168,7 +218,21 @@ export function NotesDialog({
               );
             })
           )}
+          {aiThinking && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> AI is thinking…
+            </div>
+          )}
         </div>
+
+        {mode === "admin" && escalated && !locked && (
+          <div className="flex items-center gap-2 rounded-xl border border-soft-blue/30 bg-soft-blue/10 px-3 py-2 text-xs text-soft-blue">
+            <MessageSquare size={14} />
+            {assignedAdminName
+              ? `Connecting you to ${assignedAdminName}…`
+              : "Connecting you to your assigned administrator…"}
+          </div>
+        )}
 
         {locked ? (
           <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -180,12 +244,12 @@ export function NotesDialog({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder={
-                viewerRole === "admin"
-                  ? "Reply to the user…"
-                  : "Reply to the support team…"
+                mode === "ai"
+                  ? "Ask the AI about your ticket…"
+                  : "Write a message to your assigned admin…"
               }
               rows={3}
-              maxLength={4000}
+              maxLength={2000}
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send();
               }}
