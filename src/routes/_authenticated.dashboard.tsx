@@ -33,6 +33,7 @@ import {
   RatingStars,
 } from "@/components/ticket-bits";
 import { NotesDialog } from "@/components/NotesDialog";
+import { ChatbotDialog } from "@/components/ChatbotDialog";
 import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
