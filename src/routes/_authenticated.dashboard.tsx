@@ -69,11 +69,11 @@ function DashboardPage() {
   const [showForm, setShowForm] = useState(false);
   const [aiTicket, setAiTicket] = useState<Ticket | null>(null);
   const [rateTicket, setRateTicket] = useState<Ticket | null>(null);
-  const [notesTicket, setNotesTicket] = useState<Ticket | null>(null);
+  const [chatTicket, setChatTicket] = useState<Ticket | null>(null);
   const { counts: unreadCounts, clearTicket } = useNotesRealtime(
     "user",
     tickets,
-    notesTicket?.id ?? null,
+    chatTicket?.id ?? null,
   );
 
   async function refresh() {
