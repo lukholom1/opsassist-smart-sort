@@ -103,19 +103,24 @@ export function NotesDialog({
             notes.map((n) => {
               const mine = n.author_role === viewerRole;
               const isAdmin = n.author_role === "admin";
-              const initials = (n.author_name || "?")
-                .split(" ")
-                .map((p) => p[0])
-                .filter(Boolean)
-                .slice(0, 2)
-                .join("")
-                .toUpperCase();
+              const isAi = n.author_role === "ai";
+              const initials = isAi
+                ? "AI"
+                : (n.author_name || "?")
+                    .split(" ")
+                    .map((p) => p[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
               const avatar = (
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ${
-                    isAdmin
-                      ? "bg-soft-blue/15 text-soft-blue ring-soft-blue/30"
-                      : "bg-purple-accent/15 text-purple-accent ring-purple-accent/30"
+                    isAi
+                      ? "bg-warning/15 text-warning ring-warning/30"
+                      : isAdmin
+                        ? "bg-soft-blue/15 text-soft-blue ring-soft-blue/30"
+                        : "bg-purple-accent/15 text-purple-accent ring-purple-accent/30"
                   }`}
                   title={n.author_name}
                 >
@@ -133,12 +138,14 @@ export function NotesDialog({
                       <span className="font-semibold text-foreground/80">{n.author_name}</span>
                       <span
                         className={`rounded-full px-1.5 py-px text-[9px] font-medium ring-1 ring-inset ${
-                          isAdmin
-                            ? "bg-soft-blue/10 text-soft-blue ring-soft-blue/30"
-                            : "bg-purple-accent/10 text-purple-accent ring-purple-accent/30"
+                          isAi
+                            ? "bg-warning/10 text-warning ring-warning/30"
+                            : isAdmin
+                              ? "bg-soft-blue/10 text-soft-blue ring-soft-blue/30"
+                              : "bg-purple-accent/10 text-purple-accent ring-purple-accent/30"
                         }`}
                       >
-                        {isAdmin ? "Support" : "User"}
+                        {isAi ? "AI" : isAdmin ? "Support" : "User"}
                       </span>
                       <span>· {relTime(n.created_at)}</span>
                     </div>
@@ -146,9 +153,11 @@ export function NotesDialog({
                       className={`rounded-2xl px-3.5 py-2 text-sm shadow-sm ${
                         mine
                           ? "rounded-br-sm bg-primary text-primary-foreground"
-                          : isAdmin
-                            ? "rounded-bl-sm bg-soft-blue/10 text-foreground ring-1 ring-soft-blue/30"
-                            : "rounded-bl-sm bg-purple-accent/10 text-foreground ring-1 ring-purple-accent/30"
+                          : isAi
+                            ? "rounded-bl-sm bg-warning/10 text-foreground ring-1 ring-warning/30"
+                            : isAdmin
+                              ? "rounded-bl-sm bg-soft-blue/10 text-foreground ring-1 ring-soft-blue/30"
+                              : "rounded-bl-sm bg-purple-accent/10 text-foreground ring-1 ring-purple-accent/30"
                       }`}
                     >
                       <div className="whitespace-pre-wrap leading-relaxed">{n.body}</div>
