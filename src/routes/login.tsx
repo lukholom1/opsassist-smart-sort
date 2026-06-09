@@ -60,15 +60,13 @@ function normalizeEmail(input: string) {
 function SignInForm({
   onActivate,
   onForgot,
-  isAdmin = false,
 }: {
   onActivate: () => void;
   onForgot: () => void;
-  isAdmin?: boolean;
 }) {
   const navigate = useNavigate();
   const resolve = useServerFn(resolveLoginEmail);
-  const [identifier, setIdentifier] = useState(isAdmin ? "Admin" : "");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +82,7 @@ function SignInForm({
         setError("Invalid credentials. Try again.");
         return;
       }
-      navigate({ to: isAdmin ? "/admin" : "/" });
+      navigate({ to: "/" });
     } catch {
       setError("Invalid credentials. Try again.");
     } finally {
@@ -104,7 +102,7 @@ function SignInForm({
           <Input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            placeholder="Admin or you@company.com"
+            placeholder="you@company.com"
             autoFocus
             required
           />
@@ -128,7 +126,7 @@ function SignInForm({
           className="h-11 rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
         >
           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-          {isAdmin ? "Sign in" : "User sign in"}
+          Sign in
         </Button>
       </form>
       <div className="mt-4 grid gap-2">
