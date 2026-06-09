@@ -32,7 +32,7 @@ import {
   DepartmentStatusPills,
   RatingStars,
 } from "@/components/ticket-bits";
-import { NotesDialog } from "@/components/NotesDialog";
+// NotesDialog still used elsewhere; admin uses it directly. Chatbot replaces it for users.
 import { ChatbotDialog } from "@/components/ChatbotDialog";
 import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
