@@ -760,7 +760,7 @@ export type TicketNote = {
   ticket_id: string;
   author_id: string;
   author_name: string;
-  author_role: "user" | "admin";
+  author_role: "user" | "admin" | "ai";
   body: string;
   created_at: string;
 };
