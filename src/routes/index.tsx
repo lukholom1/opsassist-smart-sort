@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Logo } from "@/components/Logo";
-import { Footer } from "@/components/Footer";
+
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import {
@@ -278,7 +278,6 @@ function Landing() {
         </section>
       </main>
 
-      <Footer />
     </div>
   );
 }

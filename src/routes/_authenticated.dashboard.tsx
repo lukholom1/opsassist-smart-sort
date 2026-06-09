@@ -11,7 +11,7 @@ import {
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
-import { Footer } from "@/components/Footer";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -236,7 +236,6 @@ function DashboardPage() {
           )}
         </div>
       </main>
-      <Footer />
 
       {showForm && (
         <NewTicketDialog
