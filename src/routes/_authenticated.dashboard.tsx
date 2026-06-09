@@ -58,7 +58,10 @@ type Ticket = {
 
 function DashboardPage() {
   const navigate = useNavigate();
-  const { signOut, fullName } = useAuth();
+  const { signOut, fullName, role } = useAuth();
+  useEffect(() => {
+    if (role === "admin") navigate({ to: "/admin", replace: true });
+  }, [role, navigate]);
   const fetchMine = useServerFn(listMyTickets);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
