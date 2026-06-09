@@ -29,19 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, Search, UserPlus, Bot, Copy, Check, Users, Mail, Trash2, MessageSquare, BarChart3, ArrowRightLeft } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  elapsed,
-  CategoryPills,
-  PriorityPill,
-  RatingStars,
-} from "@/components/ticket-bits";
-import { NotesDialog } from "@/components/NotesDialog";
-import { useNotesRealtime } from "@/hooks/use-notes-realtime";
-import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
-import { AdminCharts } from "@/components/AdminCharts";
-import { getAdminAnalytics } from "@/lib/analytics.functions";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
