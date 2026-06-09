@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import {
   Sparkles,
   LogIn,
-  ShieldCheck,
+  
   Zap,
   BrainCircuit,
   BarChart3,
