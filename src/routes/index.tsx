@@ -147,14 +147,7 @@ function Landing() {
               to="/login"
               className="inline-flex h-14 items-center gap-2 rounded-2xl bg-[image:var(--gradient-hero)] px-8 text-base font-semibold text-white shadow-[var(--shadow-glow)] transition-all hover:brightness-110 hover:shadow-lg"
             >
-              <LogIn size={18} /> Sign in as User <ArrowRight size={16} />
-            </Link>
-            <Link
-              to="/login"
-              search={{ admin: 1 } as never}
-              className="inline-flex h-14 items-center gap-2 rounded-2xl border border-primary/30 bg-card px-8 text-base font-semibold text-foreground shadow-[var(--shadow-soft)] transition hover:bg-primary/5"
-            >
-              <ShieldCheck size={18} /> Sign in as Admin
+              <LogIn size={18} /> Sign in <ArrowRight size={16} />
             </Link>
           </div>
 
