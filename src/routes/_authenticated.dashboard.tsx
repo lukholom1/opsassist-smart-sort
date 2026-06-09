@@ -263,15 +263,17 @@ function DashboardPage() {
           }}
         />
       )}
-      {notesTicket && (
-        <NotesDialog
-          ticketId={notesTicket.id}
-          ticketTitle={notesTicket.title}
-          viewerRole="user"
-          ticketResolved={notesTicket.status === "Resolved"}
+      {chatTicket && (
+        <ChatbotDialog
+          ticketId={chatTicket.id}
+          ticketTitle={chatTicket.title}
+          ticketResolved={chatTicket.status === "Resolved"}
+          assignedAdminName={
+            chatTicket.assignments.find((a) => a.assignee_name)?.assignee_name ?? null
+          }
           onClose={() => {
-            clearTicket(notesTicket.id);
-            setNotesTicket(null);
+            clearTicket(chatTicket.id);
+            setChatTicket(null);
             refresh();
           }}
         />
