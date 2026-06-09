@@ -11,7 +11,7 @@ import {
 } from "@/lib/users.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
-import { Footer } from "@/components/Footer";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -298,7 +298,6 @@ function AdminPage() {
           </>
         )}
       </main>
-      <Footer />
       {showUsers && <UsersDialog onClose={() => setShowUsers(false)} />}
       {notesTicket && (
         <NotesDialog

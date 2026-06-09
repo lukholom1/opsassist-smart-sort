@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // (it touches window/document at module load).
 import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { Footer } from "@/components/Footer";
+
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -493,7 +493,6 @@ function InsightsPage() {
           {department && <> · {department}</>}
         </p>
       </main>
-      <Footer />
     </div>
   );
 }
