@@ -247,11 +247,35 @@ export function ChatbotDialog({
           )}
         </div>
 
-        {mode === "admin" && escalated && !locked && (
+        {mode === "admin" && !locked && deptAdmins.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Route to:
+            </span>
+            {deptAdmins.map((d) => (
+              <button
+                key={d.department}
+                type="button"
+                onClick={() => setSelectedDept(d.department)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  selectedDept === d.department
+                    ? "border-soft-blue/60 bg-soft-blue/15 text-soft-blue"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+                title={d.name ?? "Unassigned"}
+              >
+                {d.department}
+                {d.name ? ` · ${d.name}` : ""}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === "admin" && escalated && !locked && !conversationStarted && (
           <div className="flex items-center gap-2 rounded-xl border border-soft-blue/30 bg-soft-blue/10 px-3 py-2 text-xs text-soft-blue">
             <MessageSquare size={14} />
-            {assignedAdminName
-              ? `Connecting you to ${assignedAdminName}…`
+            {selectedAdmin?.name
+              ? `Connecting you to ${selectedAdmin.name}${selectedAdmin.department ? ` (${selectedAdmin.department})` : ""}…`
               : "Connecting you to your assigned administrator…"}
           </div>
         )}
@@ -268,7 +292,9 @@ export function ChatbotDialog({
               placeholder={
                 mode === "ai"
                   ? "Ask the AI about your ticket…"
-                  : "Write a message to your assigned admin…"
+                  : selectedAdmin
+                    ? `Message ${selectedAdmin.name ?? `${selectedAdmin.department} admin`}…`
+                    : "Write a message to your assigned admin…"
               }
               rows={3}
               maxLength={2000}
