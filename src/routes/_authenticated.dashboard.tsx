@@ -268,9 +268,7 @@ function DashboardPage() {
           ticketId={chatTicket.id}
           ticketTitle={chatTicket.title}
           ticketResolved={chatTicket.status === "Resolved"}
-          assignedAdminName={
-            chatTicket.assignments.find((a) => a.assignee_name)?.assignee_name ?? null
-          }
+          assignments={chatTicket.assignments}
           onClose={() => {
             clearTicket(chatTicket.id);
             setChatTicket(null);
