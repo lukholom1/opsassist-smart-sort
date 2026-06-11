@@ -105,7 +105,11 @@ export function ChatbotDialog({
         setBody("");
         await askBotFn({ data: { ticket_id: ticketId, message } });
       } else {
-        await addNoteFn({ data: { ticket_id: ticketId, body: message } });
+        const tag =
+          deptAdmins.length > 1 && selectedAdmin
+            ? `[To ${selectedAdmin.department}${selectedAdmin.name ? ` – ${selectedAdmin.name}` : ""}] `
+            : "";
+        await addNoteFn({ data: { ticket_id: ticketId, body: tag + message } });
         setBody("");
       }
       await refresh();
