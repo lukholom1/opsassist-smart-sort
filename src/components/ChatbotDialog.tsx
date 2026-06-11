@@ -4,6 +4,7 @@ import {
   addTicketNote,
   askTicketBot,
   listTicketNotes,
+  type AssignmentRow,
   type TicketNote,
 } from "@/lib/tickets.functions";
 import {
