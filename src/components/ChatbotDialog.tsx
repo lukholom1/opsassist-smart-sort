@@ -33,13 +33,13 @@ export function ChatbotDialog({
   ticketId,
   ticketTitle,
   ticketResolved,
-  assignedAdminName,
+  assignments,
   onClose,
 }: {
   ticketId: string;
   ticketTitle: string;
   ticketResolved: boolean;
-  assignedAdminName?: string | null;
+  assignments: AssignmentRow[];
   onClose: () => void;
 }) {
   const listFn = useServerFn(listTicketNotes);
