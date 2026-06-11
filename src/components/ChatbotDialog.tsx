@@ -46,16 +46,33 @@ export function ChatbotDialog({
   const addNoteFn = useServerFn(addTicketNote);
   const askBotFn = useServerFn(askTicketBot);
 
+  const deptAdmins = (() => {
+    const seen = new Set<string>();
+    const out: { department: string; name: string | null }[] = [];
+    for (const a of assignments) {
+      if (seen.has(a.department)) continue;
+      seen.add(a.department);
+      out.push({ department: a.department, name: a.assignee_name ?? null });
+    }
+    return out;
+  })();
+
   const [notes, setNotes] = useState<TicketNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(ticketResolved);
   const [mode, setMode] = useState<Mode>("ai");
+  const [selectedDept, setSelectedDept] = useState<string>(deptAdmins[0]?.department ?? "");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [escalated, setEscalated] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const selectedAdmin = deptAdmins.find((d) => d.department === selectedDept) ?? deptAdmins[0];
+  const conversationStarted = notes.some(
+    (n) => n.author_role === "admin" || n.author_role === "user",
+  );
 
   async function refresh() {
     try {
