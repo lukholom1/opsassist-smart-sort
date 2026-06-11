@@ -4,6 +4,7 @@ import {
   addTicketNote,
   askTicketBot,
   listTicketNotes,
+  type AssignmentRow,
   type TicketNote,
 } from "@/lib/tickets.functions";
 import {
@@ -32,29 +33,46 @@ export function ChatbotDialog({
   ticketId,
   ticketTitle,
   ticketResolved,
-  assignedAdminName,
+  assignments,
   onClose,
 }: {
   ticketId: string;
   ticketTitle: string;
   ticketResolved: boolean;
-  assignedAdminName?: string | null;
+  assignments: AssignmentRow[];
   onClose: () => void;
 }) {
   const listFn = useServerFn(listTicketNotes);
   const addNoteFn = useServerFn(addTicketNote);
   const askBotFn = useServerFn(askTicketBot);
 
+  const deptAdmins = (() => {
+    const seen = new Set<string>();
+    const out: { department: string; name: string | null }[] = [];
+    for (const a of assignments) {
+      if (seen.has(a.department)) continue;
+      seen.add(a.department);
+      out.push({ department: a.department, name: a.assignee_name ?? null });
+    }
+    return out;
+  })();
+
   const [notes, setNotes] = useState<TicketNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [locked, setLocked] = useState(ticketResolved);
   const [mode, setMode] = useState<Mode>("ai");
+  const [selectedDept, setSelectedDept] = useState<string>(deptAdmins[0]?.department ?? "");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [aiThinking, setAiThinking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [escalated, setEscalated] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
+
+  const selectedAdmin = deptAdmins.find((d) => d.department === selectedDept) ?? deptAdmins[0];
+  const conversationStarted = notes.some(
+    (n) => n.author_role === "admin" || n.author_role === "user",
+  );
 
   async function refresh() {
     try {
@@ -87,7 +105,11 @@ export function ChatbotDialog({
         setBody("");
         await askBotFn({ data: { ticket_id: ticketId, message } });
       } else {
-        await addNoteFn({ data: { ticket_id: ticketId, body: message } });
+        const tag =
+          deptAdmins.length > 1 && selectedAdmin
+            ? `[To ${selectedAdmin.department}${selectedAdmin.name ? ` – ${selectedAdmin.name}` : ""}] `
+            : "";
+        await addNoteFn({ data: { ticket_id: ticketId, body: tag + message } });
         setBody("");
       }
       await refresh();
@@ -225,11 +247,35 @@ export function ChatbotDialog({
           )}
         </div>
 
-        {mode === "admin" && escalated && !locked && (
+        {mode === "admin" && !locked && deptAdmins.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Route to:
+            </span>
+            {deptAdmins.map((d) => (
+              <button
+                key={d.department}
+                type="button"
+                onClick={() => setSelectedDept(d.department)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  selectedDept === d.department
+                    ? "border-soft-blue/60 bg-soft-blue/15 text-soft-blue"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+                title={d.name ?? "Unassigned"}
+              >
+                {d.department}
+                {d.name ? ` · ${d.name}` : ""}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {mode === "admin" && escalated && !locked && !conversationStarted && (
           <div className="flex items-center gap-2 rounded-xl border border-soft-blue/30 bg-soft-blue/10 px-3 py-2 text-xs text-soft-blue">
             <MessageSquare size={14} />
-            {assignedAdminName
-              ? `Connecting you to ${assignedAdminName}…`
+            {selectedAdmin?.name
+              ? `Connecting you to ${selectedAdmin.name}${selectedAdmin.department ? ` (${selectedAdmin.department})` : ""}…`
               : "Connecting you to your assigned administrator…"}
           </div>
         )}
@@ -246,7 +292,9 @@ export function ChatbotDialog({
               placeholder={
                 mode === "ai"
                   ? "Ask the AI about your ticket…"
-                  : "Write a message to your assigned admin…"
+                  : selectedAdmin
+                    ? `Message ${selectedAdmin.name ?? `${selectedAdmin.department} admin`}…`
+                    : "Write a message to your assigned admin…"
               }
               rows={3}
               maxLength={2000}
