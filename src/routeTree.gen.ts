@@ -16,6 +16,7 @@ import { Route as AuthenticatedItRouteImport } from './routes/_authenticated.it'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated.dashboard'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.admin'
 import { Route as AuthenticatedAdminTicketsRouteImport } from './routes/_authenticated.admin.tickets'
+import { Route as AuthenticatedAdminPredictionsRouteImport } from './routes/_authenticated.admin.predictions'
 import { Route as AuthenticatedAdminInsightsRouteImport } from './routes/_authenticated.admin.insights'
 
 const LoginRoute = LoginRouteImport.update({
@@ -53,6 +54,12 @@ const AuthenticatedAdminTicketsRoute =
     path: '/tickets',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminPredictionsRoute =
+  AuthenticatedAdminPredictionsRouteImport.update({
+    id: '/predictions',
+    path: '/predictions',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminInsightsRoute =
   AuthenticatedAdminInsightsRouteImport.update({
     id: '/insights',
@@ -67,6 +74,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRoutesByTo {
@@ -76,6 +84,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRoutesById {
@@ -87,6 +96,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/it': typeof AuthenticatedItRoute
   '/_authenticated/admin/insights': typeof AuthenticatedAdminInsightsRoute
+  '/_authenticated/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/_authenticated/admin/tickets': typeof AuthenticatedAdminTicketsRoute
 }
 export interface FileRouteTypes {
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/it'
     | '/admin/insights'
+    | '/admin/predictions'
     | '/admin/tickets'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/it'
     | '/admin/insights'
+    | '/admin/predictions'
     | '/admin/tickets'
   id:
     | '__root__'
@@ -117,6 +129,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/it'
     | '/_authenticated/admin/insights'
+    | '/_authenticated/admin/predictions'
     | '/_authenticated/admin/tickets'
   fileRoutesById: FileRoutesById
 }
@@ -177,6 +190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminTicketsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/predictions': {
+      id: '/_authenticated/admin/predictions'
+      path: '/predictions'
+      fullPath: '/admin/predictions'
+      preLoaderRoute: typeof AuthenticatedAdminPredictionsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/insights': {
       id: '/_authenticated/admin/insights'
       path: '/insights'
@@ -189,11 +209,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminInsightsRoute: typeof AuthenticatedAdminInsightsRoute
+  AuthenticatedAdminPredictionsRoute: typeof AuthenticatedAdminPredictionsRoute
   AuthenticatedAdminTicketsRoute: typeof AuthenticatedAdminTicketsRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminInsightsRoute: AuthenticatedAdminInsightsRoute,
+  AuthenticatedAdminPredictionsRoute: AuthenticatedAdminPredictionsRoute,
   AuthenticatedAdminTicketsRoute: AuthenticatedAdminTicketsRoute,
 }
 
