@@ -75,6 +75,12 @@ function AdminPage() {
                 Insights
               </Link>
             </Button>
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
+              <Link to="/admin/predictions">
+                <LineChart size={14} className="mr-1.5" />
+                Predictions
+              </Link>
+            </Button>
             {isSuperAdmin && (
               <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="rounded-lg">
                 <Users size={14} className="mr-1.5" /> Users
