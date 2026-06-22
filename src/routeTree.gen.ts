@@ -18,6 +18,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAdminTicketsRouteImport } from './routes/_authenticated.admin.tickets'
 import { Route as AuthenticatedAdminPredictionsRouteImport } from './routes/_authenticated.admin.predictions'
 import { Route as AuthenticatedAdminInsightsRouteImport } from './routes/_authenticated.admin.insights'
+import { Route as AuthenticatedAdminComplianceRouteImport } from './routes/_authenticated.admin.compliance'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -66,6 +67,12 @@ const AuthenticatedAdminInsightsRoute =
     path: '/insights',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminComplianceRoute =
+  AuthenticatedAdminComplianceRouteImport.update({
+    id: '/compliance',
+    path: '/compliance',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
+  '/admin/compliance': typeof AuthenticatedAdminComplianceRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -83,6 +91,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/it': typeof AuthenticatedItRoute
+  '/admin/compliance': typeof AuthenticatedAdminComplianceRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -95,6 +104,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/it': typeof AuthenticatedItRoute
+  '/_authenticated/admin/compliance': typeof AuthenticatedAdminComplianceRoute
   '/_authenticated/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/_authenticated/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/_authenticated/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/it'
+    | '/admin/compliance'
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/it'
+    | '/admin/compliance'
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
@@ -128,6 +140,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
     | '/_authenticated/it'
+    | '/_authenticated/admin/compliance'
     | '/_authenticated/admin/insights'
     | '/_authenticated/admin/predictions'
     | '/_authenticated/admin/tickets'
@@ -204,16 +217,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminInsightsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/compliance': {
+      id: '/_authenticated/admin/compliance'
+      path: '/compliance'
+      fullPath: '/admin/compliance'
+      preLoaderRoute: typeof AuthenticatedAdminComplianceRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
   }
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminComplianceRoute: typeof AuthenticatedAdminComplianceRoute
   AuthenticatedAdminInsightsRoute: typeof AuthenticatedAdminInsightsRoute
   AuthenticatedAdminPredictionsRoute: typeof AuthenticatedAdminPredictionsRoute
   AuthenticatedAdminTicketsRoute: typeof AuthenticatedAdminTicketsRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminComplianceRoute: AuthenticatedAdminComplianceRoute,
   AuthenticatedAdminInsightsRoute: AuthenticatedAdminInsightsRoute,
   AuthenticatedAdminPredictionsRoute: AuthenticatedAdminPredictionsRoute,
   AuthenticatedAdminTicketsRoute: AuthenticatedAdminTicketsRoute,
