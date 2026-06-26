@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Loader2,
@@ -11,6 +11,10 @@ import {
   Activity,
   Sparkles,
   ShieldAlert,
+  Lightbulb,
+  CalendarDays,
+  Building2,
+  Target,
 } from "lucide-react";
 import {
   Area,
@@ -21,6 +25,9 @@ import {
   XAxis,
   YAxis,
   ReferenceDot,
+  BarChart,
+  Bar,
+  Cell,
 } from "recharts";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
@@ -34,7 +41,6 @@ export const Route = createFileRoute("/_authenticated/admin/predictions")({
 
 function PredictionsPage() {
   const { fullName, department } = useAuth();
-  const navigate = useNavigate();
   const fetchForecast = useServerFn(getWorkloadForecast);
   const [data, setData] = useState<Forecast | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,20 +70,19 @@ function PredictionsPage() {
               </Link>
             </Button>
             <span className="hidden text-sm text-muted-foreground sm:inline">
-              {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
+              {fullName ?? "Admin"}{" "}
+              {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Predictive Insights</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Forecast tomorrow's ticket workload using historical patterns, recent trends, and day-of-week seasonality.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Predictive Insights</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A quick read on tomorrow's expected workload and where to focus your team.
+          </p>
         </div>
 
         {loading && (
@@ -123,52 +128,91 @@ function ForecastView({ data }: { data: Forecast }) {
         ? "text-warning"
         : "text-success";
 
+  const topDept = data.departmentForecasts[0];
+  const recommendedAction = useMemo(() => buildAction(data), [data]);
+  const weekdayInsight = useMemo(() => buildWeekdayInsight(data), [data]);
+  const forecastDow = useMemo(() => {
+    if (!data.forecast.date) return -1;
+    return new Date(data.forecast.date).getDay();
+  }, [data.forecast.date]);
+
   return (
-    <div className="mt-6 space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="mt-6 space-y-8">
+      {/* 1. Summary cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           label="Projected workload"
           value={data.forecast.value}
           sub={`Expected tickets ${data.forecast.date ? "on " + data.forecast.date : "tomorrow"}`}
-          icon={<Activity size={14} />}
+          icon={<Activity size={16} />}
           tone="blue"
+          big
         />
         <SummaryCard
-          label="Trend direction"
+          label="Trend"
           value={data.trend.direction}
-          sub={`${data.trend.deltaPct >= 0 ? "+" : ""}${data.trend.deltaPct}% vs prior week`}
-          icon={<TrendIcon size={14} />}
-          tone={data.trend.direction === "Increasing" ? "warning" : data.trend.direction === "Decreasing" ? "success" : "blue"}
+          sub={`${data.trend.deltaPct >= 0 ? "▲ +" : "▼ "}${data.trend.deltaPct}% vs prior week`}
+          icon={<TrendIcon size={16} />}
+          tone={
+            data.trend.direction === "Increasing"
+              ? "warning"
+              : data.trend.direction === "Decreasing"
+                ? "success"
+                : "blue"
+          }
           textTone={trendTone}
         />
         <SummaryCard
           label="Risk level"
           value={data.risk.level}
-          sub={data.risk.surgeExpected ? "Surge expected" : `Threshold: ${data.risk.threshold}/day`}
-          icon={<ShieldAlert size={14} />}
-          tone={data.risk.level === "High" ? "warning" : "purple"}
+          sub={data.risk.surgeExpected ? "Surge expected" : "Within normal range"}
+          icon={<ShieldAlert size={16} />}
+          tone={
+            data.risk.level === "High"
+              ? "warning"
+              : data.risk.level === "Medium"
+                ? "warning"
+                : "success"
+          }
           textTone={riskTone}
         />
         <SummaryCard
           label="Confidence range"
           value={`${data.forecast.lower}–${data.forecast.upper}`}
-          sub="Lower / upper estimate"
-          icon={<Sparkles size={14} />}
+          sub="Expected ticket range"
+          icon={<Target size={16} />}
           tone="purple"
         />
       </div>
 
-      {/* Forecast chart */}
+      {/* 2. AI Recommendation */}
+      <Panel tone="purple" icon={<Sparkles size={16} />} title="AI Recommendation">
+        <p className="text-sm leading-relaxed text-foreground/90">{data.insight}</p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Based on recent 7-day average of {data.trend.recentAvg} tickets/day vs prior week
+          {" "}({data.trend.previousAvg}).
+        </p>
+      </Panel>
+
+      {/* 3. Forecast chart (compact) */}
       <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-5 shadow-[var(--shadow-soft)]">
         <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-gradient-to-br from-soft-blue/25 via-purple-accent/10 to-transparent blur-3xl" />
-        <h3 className="relative text-sm font-semibold tracking-tight">Workload forecast</h3>
-        <p className="relative text-xs text-muted-foreground">
-          Historical daily ticket counts with tomorrow's projection and confidence band.
-        </p>
-        <div className="relative mt-4 h-[300px] w-full">
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">Tomorrow's Forecast</h3>
+            <p className="text-xs text-muted-foreground">
+              Recent history with tomorrow's projection and confidence band.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <LegendDot color="hsl(var(--soft-blue))" label="History" />
+            <LegendDot color="hsl(var(--purple-accent))" label="Forecast" dashed />
+            <LegendDot color="hsl(var(--purple-accent))" label="Confidence" faded />
+          </div>
+        </div>
+        <div className="relative mt-4 h-[200px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={buildChartSeries(data)}>
+            <ComposedChart data={buildChartSeries(data)} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <defs>
                 <linearGradient id="histFill" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(var(--soft-blue))" stopOpacity={0.4} />
@@ -189,23 +233,8 @@ function ForecastView({ data }: { data: Forecast }) {
                   fontSize: 12,
                 }}
               />
-              <Area
-                type="monotone"
-                dataKey="band"
-                stroke="none"
-                fill="url(#bandFill)"
-                isAnimationActive={false}
-                name="Confidence range"
-              />
-              <Area
-                type="monotone"
-                dataKey="history"
-                stroke="hsl(var(--soft-blue))"
-                strokeWidth={2}
-                fill="url(#histFill)"
-                connectNulls
-                name="Historical"
-              />
+              <Area type="monotone" dataKey="band" stroke="none" fill="url(#bandFill)" isAnimationActive={false} name="Confidence range" />
+              <Area type="monotone" dataKey="history" stroke="hsl(var(--soft-blue))" strokeWidth={2} fill="url(#histFill)" connectNulls name="Historical" />
               <Line
                 type="monotone"
                 dataKey="forecast"
@@ -219,84 +248,147 @@ function ForecastView({ data }: { data: Forecast }) {
               <ReferenceDot
                 x={data.forecast.date}
                 y={data.forecast.value}
-                r={5}
+                r={6}
                 fill="hsl(var(--purple-accent))"
                 stroke="hsl(var(--card))"
+                strokeWidth={2}
               />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Category & Department forecasts */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ForecastList
-          title="Category forecasts"
-          subtitle="Which categories will drive workload"
-          items={data.categoryForecasts.map((c) => ({
-            label: c.category,
-            value: c.predicted,
-            badge: c.level,
-            tone:
-              c.level === "High" ? "warning" : c.level === "Low" ? "success" : "blue",
-          }))}
-        />
-        <ForecastList
-          title="Department forecasts"
-          subtitle="Expected workload by department"
-          items={data.departmentForecasts.map((d) => ({
-            label: d.department,
-            value: d.predicted,
-            badge: `${d.predicted} tickets`,
-            tone: "purple",
-          }))}
-        />
-      </div>
-
-      {/* Insight panel */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-[image:var(--gradient-hero)]/10 bg-card/80 p-6 shadow-[var(--shadow-soft)]">
-        <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-gradient-to-br from-purple-accent/25 via-soft-blue/10 to-transparent blur-3xl" />
-        <div className="relative flex items-start gap-3">
-          <div className="rounded-full bg-purple-accent/15 p-2 text-purple-accent">
-            <Sparkles size={16} />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold tracking-tight">Business insight</h3>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/90">{data.insight}</p>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Recent 7-day average: {data.trend.recentAvg} · Prior 7-day average: {data.trend.previousAvg} · Surge threshold (P90): {data.risk.threshold}/day
-            </p>
-          </div>
+      {/* 4. Department Workload Forecast (merged) */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-6 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center gap-2">
+          <Building2 size={16} className="text-soft-blue" />
+          <h3 className="text-sm font-semibold tracking-tight">Department Workload Forecast</h3>
         </div>
-      </div>
-
-      {/* Day-of-week pattern */}
-      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-5 shadow-[var(--shadow-soft)]">
-        <h3 className="text-sm font-semibold tracking-tight">Day-of-week pattern</h3>
-        <p className="text-xs text-muted-foreground">Average tickets received per weekday in the historical window.</p>
-        <div className="mt-4 grid grid-cols-7 gap-2">
-          {data.dayOfWeekAverages.map((d) => {
-            const max = Math.max(...data.dayOfWeekAverages.map((x) => x.avg), 1);
-            const pct = (d.avg / max) * 100;
+        <p className="mt-1 text-xs text-muted-foreground">
+          Predicted tickets per department for tomorrow, ranked by expected volume.
+        </p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          {data.departmentForecasts.length === 0 && (
+            <p className="text-xs text-muted-foreground">No recent activity to project from.</p>
+          )}
+          {data.departmentForecasts.map((d) => {
+            const maxVal = Math.max(...data.departmentForecasts.map((x) => x.predicted), 1);
+            const pct = (d.predicted / maxVal) * 100;
+            const cat = data.categoryForecasts.find((c) => c.category === d.department);
+            const level = cat?.level ?? "Normal";
+            const trend =
+              level === "High"
+                ? { icon: TrendingUp, tone: "text-warning", label: "Increasing" }
+                : level === "Low"
+                  ? { icon: TrendingDown, tone: "text-success", label: "Low workload" }
+                  : { icon: Minus, tone: "text-muted-foreground", label: "Stable" };
+            const TIcon = trend.icon;
             return (
-              <div key={d.day} className="flex flex-col items-center gap-1.5">
-                <div className="relative h-24 w-full overflow-hidden rounded-lg bg-muted/40">
+              <div
+                key={d.department}
+                className="rounded-2xl border border-border/60 bg-background/40 p-4"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">{d.department}</span>
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium ${trend.tone}`}>
+                    <TIcon size={13} /> {trend.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-2xl font-semibold tabular-nums">
+                  {d.predicted}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">predicted tickets</span>
+                </p>
+                <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted/40">
                   <div
-                    className="absolute bottom-0 w-full rounded-lg bg-[image:var(--gradient-hero)]"
-                    style={{ height: `${pct}%` }}
+                    className="h-full rounded-full bg-[image:var(--gradient-hero)]"
+                    style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {d.day}
-                </span>
-                <span className="text-xs font-semibold tabular-nums">{d.avg}</span>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* 5. Historical Weekly Trends */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-6 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center gap-2">
+          <CalendarDays size={16} className="text-soft-blue" />
+          <h3 className="text-sm font-semibold tracking-tight">Historical Weekly Trends</h3>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Average tickets received per weekday. The highlighted bar is tomorrow's forecast day.
+        </p>
+        <div className="mt-4 h-[180px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data.dayOfWeekAverages} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{
+                  background: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: 12,
+                  fontSize: 12,
+                }}
+              />
+              <Bar dataKey="avg" radius={[6, 6, 0, 0]}>
+                {data.dayOfWeekAverages.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={i === forecastDow ? "hsl(var(--purple-accent))" : "hsl(var(--soft-blue))"}
+                    fillOpacity={i === forecastDow ? 1 : 0.55}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">{weekdayInsight}</p>
+      </div>
+
+      {/* 6. Recommended Action */}
+      <Panel tone="warning" icon={<Lightbulb size={16} />} title="Recommended Action">
+        <p className="text-sm leading-relaxed text-foreground/90">{recommendedAction}</p>
+        {topDept && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Focus department: <span className="font-medium text-foreground">{topDept.department}</span>{" "}
+            · expected volume {topDept.predicted} tickets.
+          </p>
+        )}
+      </Panel>
     </div>
   );
+}
+
+function buildAction(data: Forecast): string {
+  const top = data.departmentForecasts[0];
+  if (data.risk.level === "High" || data.risk.surgeExpected) {
+    return `A workload surge is likely tomorrow. Consider assigning at least one additional ${
+      top ? top.department + " " : ""
+    }support agent and prioritising high-impact tickets early in the day.`;
+  }
+  if (data.trend.direction === "Increasing") {
+    return `Ticket volume is trending upward (${data.trend.deltaPct}% vs last week). ${
+      top ? `Monitor ${top.department} response times closely` : "Monitor response times closely"
+    } and prepare backup capacity in case the trend continues.`;
+  }
+  if (data.trend.direction === "Decreasing") {
+    return `Workload is easing compared to last week. Current staffing levels should be sufficient — a good window to clear backlog and catch up on long-running tickets.`;
+  }
+  return `No significant workload change expected. Current staffing levels should be sufficient${
+    top ? `, with ${top.department} likely to see the most activity.` : "."
+  }`;
+}
+
+function buildWeekdayInsight(data: Forecast): string {
+  const days = data.dayOfWeekAverages;
+  if (!days.length) return "";
+  const sorted = [...days].sort((a, b) => b.avg - a.avg);
+  const high = sorted[0];
+  const low = sorted[sorted.length - 1];
+  if (!high || !low || high.avg === 0) return "Not enough weekday history to identify a pattern yet.";
+  return `Historically, ${high.day} sees the highest activity (~${high.avg}/day) while ${low.day} is the quietest (~${low.avg}/day).`;
 }
 
 function buildChartSeries(data: Forecast) {
@@ -306,13 +398,9 @@ function buildChartSeries(data: Forecast) {
     forecast: null as number | null,
     band: null as [number, number] | null,
   }));
-  // Bridge last historical point to forecast
   const last = data.history[data.history.length - 1];
   if (last) {
-    hist[hist.length - 1] = {
-      ...hist[hist.length - 1],
-      forecast: last.count,
-    };
+    hist[hist.length - 1] = { ...hist[hist.length - 1], forecast: last.count };
   }
   hist.push({
     date: data.forecast.date,
@@ -330,6 +418,7 @@ function SummaryCard({
   icon,
   tone = "blue",
   textTone,
+  big,
 }: {
   label: string;
   value: React.ReactNode;
@@ -337,6 +426,7 @@ function SummaryCard({
   icon?: React.ReactNode;
   tone?: "blue" | "success" | "purple" | "warning";
   textTone?: string;
+  big?: boolean;
 }) {
   const ring =
     tone === "success"
@@ -355,67 +445,73 @@ function SummaryCard({
           ? "text-warning"
           : "text-soft-blue";
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/80 p-4 shadow-[var(--shadow-soft)] backdrop-blur-sm">
-      <div className={`pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-br ${ring} blur-2xl`} />
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-card/80 p-5 shadow-[var(--shadow-soft)] backdrop-blur-sm">
+      <div
+        className={`pointer-events-none absolute -top-10 -right-10 h-24 w-24 rounded-full bg-gradient-to-br ${ring} blur-2xl`}
+      />
       <div className="relative flex items-center gap-2">
         <span className={iconTone}>{icon}</span>
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
       </div>
-      <p className={`relative mt-2 text-2xl font-semibold tracking-tight ${textTone ?? "text-foreground"}`}>
+      <p
+        className={`relative mt-2 font-semibold tracking-tight ${big ? "text-4xl" : "text-3xl"} ${
+          textTone ?? "text-foreground"
+        }`}
+      >
         {value}
       </p>
-      {sub && <p className="relative mt-1 text-[11px] text-muted-foreground">{sub}</p>}
+      {sub && <p className="relative mt-1.5 text-xs text-muted-foreground">{sub}</p>}
     </div>
   );
 }
 
-function ForecastList({
+function Panel({
+  tone,
+  icon,
   title,
-  subtitle,
-  items,
+  children,
 }: {
+  tone: "purple" | "warning";
+  icon: React.ReactNode;
   title: string;
-  subtitle: string;
-  items: { label: string; value: number; badge: string; tone: "blue" | "purple" | "warning" | "success" }[];
+  children: React.ReactNode;
 }) {
+  const accent =
+    tone === "warning"
+      ? { bg: "bg-warning/15", text: "text-warning", glow: "from-warning/25 via-warning/5 to-transparent" }
+      : {
+          bg: "bg-purple-accent/15",
+          text: "text-purple-accent",
+          glow: "from-purple-accent/25 via-soft-blue/10 to-transparent",
+        };
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-5 shadow-[var(--shadow-soft)]">
-      <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
-      <p className="text-xs text-muted-foreground">{subtitle}</p>
-      <div className="mt-4 space-y-2">
-        {items.length === 0 && (
-          <p className="text-xs text-muted-foreground">No recent activity to project from.</p>
-        )}
-        {items.map((it) => {
-          const max = Math.max(...items.map((x) => x.value), 1);
-          const pct = (it.value / max) * 100;
-          const badgeTone =
-            it.tone === "warning"
-              ? "bg-warning/15 text-warning"
-              : it.tone === "success"
-                ? "bg-success/15 text-success"
-                : it.tone === "purple"
-                  ? "bg-purple-accent/15 text-purple-accent"
-                  : "bg-soft-blue/15 text-soft-blue";
-          return (
-            <div key={it.label} className="rounded-xl border border-border/60 bg-background/40 p-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{it.label}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${badgeTone}`}>
-                  {it.badge}
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-                <div
-                  className="h-full rounded-full bg-[image:var(--gradient-hero)]"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">{it.value} predicted tickets</p>
-            </div>
-          );
-        })}
+    <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-6 shadow-[var(--shadow-soft)]">
+      <div
+        className={`pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-gradient-to-br ${accent.glow} blur-3xl`}
+      />
+      <div className="relative flex items-start gap-3">
+        <div className={`rounded-full ${accent.bg} p-2 ${accent.text}`}>{icon}</div>
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+          <div className="mt-2">{children}</div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function LegendDot({ color, label, dashed, faded }: { color: string; label: string; dashed?: boolean; faded?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full"
+        style={{
+          background: faded ? `${color}` : color,
+          opacity: faded ? 0.35 : 1,
+          border: dashed ? `1px dashed ${color}` : "none",
+        }}
+      />
+      {label}
+    </span>
   );
 }
