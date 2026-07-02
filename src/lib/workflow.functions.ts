@@ -316,6 +316,9 @@ export const decideApproval = createServerFn({ method: "POST" })
       return { ok: true };
     }
 
+    // Manual (stage-less) approval — no workflow to advance.
+    if (!approval.stage_id) return { ok: true };
+
     // Approved — check if all approvals for this stage are approved, then advance.
     const { data: sibling } = await supabaseAdmin
       .from("workflow_approvals")
@@ -333,6 +336,7 @@ export const decideApproval = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
 
 const CompleteOpSchema = z.object({
   ticket_id: z.string().uuid(),
