@@ -75,6 +75,12 @@ function AdminPage() {
                 Insights
               </Link>
             </Button>
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10">
+              <Link to="/admin/approvals">
+                <ClipboardCheck size={14} className="mr-1.5" />
+                Approvals
+              </Link>
+            </Button>
             <Button asChild variant="outline" size="sm" className="rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
               <Link to="/admin/predictions">
                 <LineChart size={14} className="mr-1.5" />
