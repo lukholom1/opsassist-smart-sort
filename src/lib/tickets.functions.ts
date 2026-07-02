@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { detectTemplateFor, bootstrapWorkflowForTicket } from "./workflow.functions";
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
 const PRIORITIES = ["High", "Medium", "Low"] as const;
