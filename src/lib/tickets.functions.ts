@@ -873,7 +873,7 @@ export type TicketActivityRow = {
   actor_role: string;
   event_type: string;
   description: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, string | number | boolean | null>;
   created_at: string;
 };
 
