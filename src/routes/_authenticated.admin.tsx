@@ -30,7 +30,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield } from "lucide-react";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ShieldCheck } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
