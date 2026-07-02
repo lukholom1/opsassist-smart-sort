@@ -42,12 +42,18 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4">
+        <div className="grid gap-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill value={ticket.status} />
             <PriorityPill value={ticket.priority} />
             <CategoryPills values={ticket.categories} />
           </div>
+
+          <WorkflowTracker
+            current={(ticket.workflow_stage as WorkflowStage | undefined) ?? "assigned"}
+            approvalRequired={!!ticket.approval_required}
+          />
+
 
           <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
