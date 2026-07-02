@@ -148,21 +148,9 @@ export const submitTicket = createServerFn({ method: "POST" })
     const { error: aerr } = await supabaseAdmin.from("ticket_assignments").insert(rows);
     if (aerr) throw new Error(aerr.message);
 
-    // Conditional Approval Workflow: attach if ticket matches a template.
-    try {
-      const match = await detectTemplateFor(data.title, data.details);
-      if (match) {
-        await bootstrapWorkflowForTicket({
-          ticket_id: row.id,
-          template: match.template,
-          stages: match.stages,
-          actor_id: context.userId,
-          actor_name: userName,
-        });
-      }
-    } catch (e) {
-      console.error("workflow bootstrap failed", e);
-    }
+    // Conditional Approval Workflow is now manual — admins request approvals
+    // from the ticket details dialog. No auto-bootstrap on submit.
+
 
     return { id: row.id, categories, priority };
   });
