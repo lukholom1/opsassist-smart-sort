@@ -30,9 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ShieldCheck } from "lucide-react";
-import { NotificationBell } from "@/components/NotificationBell";
-
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -94,20 +92,12 @@ function AdminPage() {
                 <Users size={14} className="mr-1.5" /> Users
               </Button>
             )}
-            <Button asChild variant="outline" size="sm" className="rounded-lg border-amber-500/40 text-amber-700 hover:bg-amber-500/10">
-              <Link to="/admin/approvals">
-                <ShieldCheck size={14} className="mr-1.5" />
-                Approvals
-              </Link>
-            </Button>
-            <NotificationBell />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
               <LogOut size={14} className="mr-1.5" /> Sign out
             </Button>
-
           </div>
         </div>
       </header>

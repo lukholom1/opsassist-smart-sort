@@ -1,10 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CategoryPills, PriorityPill, StatusPill, RatingStars, elapsed } from "@/components/ticket-bits";
 import { Bot, Calendar, User, Building2 } from "lucide-react";
-import { WorkflowTracker, type WorkflowStage } from "@/components/WorkflowTracker";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
 import type { AssignmentRow } from "@/lib/tickets.functions";
-
 
 type Ticket = {
   id: string;
@@ -17,12 +14,9 @@ type Ticket = {
   created_at: string;
   resolved_at: string | null;
   resolved_by_ai: boolean;
-  workflow_stage?: string | null;
-  approval_required?: boolean | null;
   assignments: AssignmentRow[];
   feedback: { rating: number; comment: string | null } | null;
 };
-
 
 export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   return (
@@ -42,18 +36,12 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="grid gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill value={ticket.status} />
             <PriorityPill value={ticket.priority} />
             <CategoryPills values={ticket.categories} />
           </div>
-
-          <WorkflowTracker
-            current={(ticket.workflow_stage as WorkflowStage | undefined) ?? "assigned"}
-            approvalRequired={!!ticket.approval_required}
-          />
-
 
           <div className="grid gap-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
@@ -102,10 +90,7 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
               )}
             </div>
           )}
-
-          <ActivityTimeline ticketId={ticket.id} />
         </div>
-
       </DialogContent>
     </Dialog>
   );

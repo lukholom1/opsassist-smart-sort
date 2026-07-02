@@ -35,8 +35,6 @@ import {
 // NotesDialog still used elsewhere; admin uses it directly. Chatbot replaces it for users.
 import { ChatbotDialog } from "@/components/ChatbotDialog";
 import { useNotesRealtime } from "@/hooks/use-notes-realtime";
-import { NotificationBell } from "@/components/NotificationBell";
-
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
@@ -121,11 +119,9 @@ function DashboardPage() {
             <span className="hidden text-sm text-muted-foreground sm:inline">
               Hi, <span className="font-medium text-foreground">{fullName ?? "there"}</span>
             </span>
-            <NotificationBell />
             <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
               <LogOut size={14} className="mr-1.5" /> Sign out
             </Button>
-
           </div>
         </div>
       </header>

@@ -1,54 +1,96 @@
-# Week 7 Sprint — Phased Plan
+# OpsAssist Enterprise Enhancement Plan
 
-Approval-required keywords: **Leave, Sick, Emergency, Broken, Replacement, Critical** (case-insensitive match on title/details/category).
-New role: **manager** (added to `app_role` enum).
+Extending the existing system (no rebuild). All tickets stay in one `tickets` table; we add per-department assignments, department-scoped admins, controlled AI, email OTP, and ratings.
 
----
+## 1. Database changes (migration)
 
-## Phase 1 — Foundations: Routing, Workflow Engine, Activity Log
-Goal: every new ticket flows through classification → priority → department → owner assignment automatically, with a visible workflow state and audit trail. No user intervention after submission.
+**Schema changes:**
+- `profiles`: add `department text` (nullable; only set for Department Admins).
+- New enum/check: departments = `HR | IT | Finance | Operations`.
+- Drop the old `it_personnel` role usage in favor of a single `admin` role + `profiles.department`. Keep `admin` and `employee` in the enum (no migration of enum needed — we just stop creating `it_personnel`). Existing admin (global) = admin with `department = NULL` (super admin).
+- New table `ticket_assignments`:
+  - `id uuid pk`
+  - `ticket_id uuid → tickets`
+  - `department text` (HR/IT/Finance/Ops)
+  - `assigned_to uuid` (department admin user, nullable)
+  - `status text default 'Open'` (Open/In Progress/Resolved)
+  - `resolved_at timestamptz`
+  - `resolved_by_ai bool default false`
+  - unique(ticket_id, department)
+- New table `ticket_feedback`:
+  - `ticket_id uuid pk → tickets`
+  - `user_id uuid`
+  - `rating int 1..5`
+  - `comment text`
+  - `created_at`
+- `tickets`: keep `category` for backward compat but add `categories text[]` (multi-dept). Add `resolution_source text` ('ai' | 'department' | null).
+- `pending_activations`: already has email + otp. We'll send OTP via Resend.
 
-**DB migration**
-- Extend `app_role` enum: add `'manager'`.
-- `tickets`: add `workflow_stage TEXT` (submitted | ai_classified | pending_approval | approved | assigned | in_progress | resolved | closed), `sla_hours INT`, `approval_required BOOLEAN`.
-- New `ticket_activity` table: id, ticket_id, actor_id, actor_name, actor_role, event_type, description, metadata jsonb, created_at. RLS: readable by ticket participants + admins of relevant departments.
-- Trigger: on `tickets` insert/update of key fields → append activity row.
+**RLS:**
+- `ticket_assignments`: admins can SELECT where `department = caller's profile.department` OR caller is super admin (department NULL). Employees can SELECT where they own the parent ticket. Admins can UPDATE rows in their department.
+- `tickets` SELECT: owner, super admin, or admin whose department appears in `categories`.
+- `ticket_feedback`: owner inserts/selects; admins read for tickets in their dept.
+- Helper SQL function `user_department(uid)` (security definer).
 
-**Backend (`src/lib/`)**
-- `routing.server.ts`: `routeTicket(ticket)` → picks department admin (least-busy) or manager (critical priority) per department. Modular rule list.
-- `workflow.server.ts`: `advanceStage(ticketId, stage, actor)` helper; validates transitions; writes activity.
-- Update `createTicket` server fn to: classify → detect approval → set stage → route → log activity.
+**Trigger:** when all `ticket_assignments` for a ticket are `Resolved`, set parent `tickets.status = 'Resolved'`, `resolved_at = now()`.
 
-**Frontend**
-- New `WorkflowTracker` component: horizontal stepper on `TicketDetailsDialog` (green completed, primary current, muted future).
-- New `ActivityTimeline` component under ticket details (newest first).
+## 2. Server functions (`src/lib/tickets.functions.ts`)
 
----
+- `classifyWithAI` → returns `{ categories: string[], priority }` (multi-dept). Heuristic fallback also returns arrays.
+- `submitTicket`: after classifying, insert ticket with `categories` array (keep `category` = first), then create one `ticket_assignments` row per category, each auto-assigned via `pickLeastBusyAdminForDept(dept)`.
+- `pickLeastBusyAdminForDept(dept)`: scope to admins with that `profiles.department`, count active assignments.
+- `updateAssignmentStatus({ assignment_id, status })`: dept admin updates one assignment; trigger handles full ticket resolution.
+- `listMyTickets`: include nested assignments.
+- `listDeptTickets`: for dept admins — assignments where `department = my dept`, joined with ticket + requester.
+- `listAllTickets`: super admin only.
+- `markResolvedByAI`: mark ticket resolved + all open assignments resolved with `resolved_by_ai=true`, set `resolution_source='ai'`.
+- `submitFeedback({ ticket_id, rating, comment })`.
+- `generateTicketResponse`: tighten system prompt — only HR/IT/Finance/Ops topics; refuse unrelated. Per-department guardrails (HR/Finance escalation only; IT troubleshoot; Ops procedural). Auto-tone preserved.
 
-## Phase 2 — Approvals + Notifications
-- **Approval detection**: keyword match on approval list → `approval_required=true`, stage=`pending_approval`, route to department manager (fallback: department admin).
-- **Approvals dashboard**: new route `/admin/approvals` — cards with requester, dept, type, priority, date, and Approve / Reject / Request Info actions. Approve → stage `approved` → `assigned`. Reject → stage `closed` with reason.
-- **Notification service**: new `notifications` table (recipient_id, title, message, ticket_id, event_type, read_at, created_at). `notify(...)` helper called from workflow/approval/routing events. Bell icon + unread badge + panel in header. Abstracted so SMTP/SendGrid can be plugged later.
+## 3. User management (`src/lib/users.functions.ts`)
 
----
+- `createPendingUser({ email, full_name, role, department? })`:
+  - validate: if `role='admin'`, department required and in enum.
+  - generate 6-digit OTP, insert into `pending_activations` (store department + role).
+  - **Send OTP email via Resend** (new helper). If `RESEND_API_KEY` missing, fall back to returning OTP for admin to share (current behavior) + console log.
+- `activateAccount`: copy department onto profile.
 
-## Phase 3 — Automation Rules + Prediction-Driven Actions
-- `automation_rules` table: id, name, enabled, conditions jsonb, actions jsonb. Seed defaults (Critical IT → Manager + SLA 2h, Workload>80% → notify Ops manager).
-- `automation.server.ts`: evaluator run on ticket create/update. Actions: assign, set SLA, notify, add tag.
-- Admin-only `/admin/automation` page: list, toggle, edit rules (JSON form to start).
-- Prediction actions: extend `predictions.functions.ts` to output `recommendations[]`. On dashboard load, evaluate against thresholds → emit notifications + render "AI Recommendations" panel with actions (increase staffing, redistribute, escalate).
+## 4. Email OTP (Resend)
 
----
+- Add `RESEND_API_KEY` secret request.
+- Helper `sendOtpEmail(email, otp, fullName)` calling Resend `from: onboarding@resend.dev`.
+- Don't block account creation if email fails — still return OTP to admin UI as fallback.
 
-## Phase 4 — Dashboard, UX & Integration Polish
-- Admin landing: add widgets — Live workflow stats, Approval summary, Pending approvals, Automation activity, Notifications, Recently completed, Manager alerts, Quick actions.
-- UX pass: loading skeletons, empty states, success toasts, filter/search refinements, mobile spacing.
-- End-to-end verification of Create → Classify → Predict → Route → Approve → Assign → Notify → Log → Report chain.
+## 5. Frontend
 
----
+- **Admin dashboard (`_authenticated.admin.tsx`)**:
+  - Detect super admin (no department) vs department admin.
+  - Super admin: user creation form with role select (Employee/Department Admin) + dept picker when admin. Sees all tickets.
+  - Department admin: only sees `listDeptTickets`. Two tables (Active / Resolved) showing assignee, priority, categories, elapsed, rating, feedback. Status dropdown updates `ticket_assignments`.
+- **Employee dashboard (`_authenticated.dashboard.tsx`)**:
+  - Show per-department status pills under each ticket.
+  - When fully resolved & no feedback yet → show star rating form.
+  - AI chat → "Issue Resolved" button calls `markResolvedByAI`.
+- **IT route** (`_authenticated.it.tsx`): remove or repurpose — fold into admin (department admin handles it). Will delete it and route IT logins to `/admin`.
+- **Ticket bits**: add `DepartmentPills`, `RatingStars` components.
 
-## Delivery
-- One phase per turn. Each phase ends with a preview verification (Playwright screenshot of new surfaces + a smoke ticket create/route/approve flow) before moving on.
-- After each phase I'll pause for your go-ahead on the next.
+## 6. Controlled AI
 
-Ready to start **Phase 1**?
+In `generateTicketResponse`, system prompt strictly scopes to four departments, refuses other topics with the canned redirect, and applies per-department behavior rules (HR empathetic-escalate, Finance formal-escalate, IT troubleshoot, Ops procedural).
+
+## 7. Out of scope (explicit)
+
+- No separate per-department databases.
+- No changes to landing page or login flow beyond what's needed.
+- Keep existing admin seed (`Admin` / `OpsAdmin@2026`) as super admin (department NULL).
+
+## Files touched
+- new: `supabase/migrations/<ts>_multi_dept.sql`
+- new: `src/lib/email.server.ts` (Resend helper)
+- edit: `src/lib/tickets.functions.ts`, `src/lib/users.functions.ts`, `src/lib/auth-helpers.server.ts` (expose `department` in context)
+- edit: `src/routes/_authenticated.admin.tsx`, `_authenticated.dashboard.tsx`
+- delete: `src/routes/_authenticated.it.tsx`
+- edit: `src/components/ticket-bits.tsx` (add Rating + DeptPills)
+- edit: `src/hooks/use-auth.ts` (expose department)
+
+After approval I'll also request the `RESEND_API_KEY` secret.
