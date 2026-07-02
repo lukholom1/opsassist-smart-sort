@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield } from "lucide-react";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ClipboardCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -73,6 +73,12 @@ function AdminPage() {
               <Link to="/admin/insights">
                 <BarChart3 size={14} className="mr-1.5" />
                 Insights
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10">
+              <Link to="/admin/approvals">
+                <ClipboardCheck size={14} className="mr-1.5" />
+                Approvals
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">

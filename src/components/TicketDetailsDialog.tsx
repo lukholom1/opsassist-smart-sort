@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CategoryPills, PriorityPill, StatusPill, RatingStars, elapsed } from "@/components/ticket-bits";
+import { WorkflowProgress } from "@/components/WorkflowProgress";
 import { Bot, Calendar, User, Building2 } from "lucide-react";
 import type { AssignmentRow } from "@/lib/tickets.functions";
 
@@ -21,7 +22,7 @@ type Ticket = {
 export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 pr-6">
             {ticket.title}
@@ -56,6 +57,8 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{ticket.details}</p>
           </div>
+
+          <WorkflowProgress ticketId={ticket.id} />
 
           {ticket.assignments.length > 0 && (
             <div className="rounded-xl border border-border bg-muted/30 p-4">

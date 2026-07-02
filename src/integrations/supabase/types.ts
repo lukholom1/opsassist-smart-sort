@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          read_at: string | null
+          ticket_id: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          read_at?: string | null
+          ticket_id?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          read_at?: string | null
+          ticket_id?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       password_resets: {
         Row: {
           created_at: string
@@ -100,6 +144,97 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      ticket_activity: {
+        Row: {
+          actor_id: string | null
+          actor_name: string
+          actor_role: string
+          created_at: string
+          description: string
+          event_type: string
+          id: string
+          metadata: Json
+          ticket_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string
+          actor_role?: string
+          created_at?: string
+          description: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          ticket_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string
+          actor_role?: string
+          created_at?: string
+          description?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_activity_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_approvals: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_name: string | null
+          decision_note: string | null
+          department: string
+          id: string
+          reason: string | null
+          status: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          department: string
+          id?: string
+          reason?: string | null
+          status?: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          department?: string
+          id?: string
+          reason?: string | null
+          status?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_approvals_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ticket_assignments: {
         Row: {
@@ -215,8 +350,61 @@ export type Database = {
           },
         ]
       }
+      ticket_workflow: {
+        Row: {
+          created_at: string
+          current_stage_id: string | null
+          status: string
+          template_id: string
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_stage_id?: string | null
+          status?: string
+          template_id: string
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_stage_id?: string | null
+          status?: string
+          template_id?: string
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_workflow_current_stage_id_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_workflow_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_workflow_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: true
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tickets: {
         Row: {
+          approval_required: boolean
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
           assigned_to: string | null
           categories: string[]
           category: string
@@ -227,12 +415,18 @@ export type Database = {
           resolution_source: string | null
           resolved_at: string | null
           resolved_by_ai: boolean
+          sla_hours: number | null
           status: string
           title: string
           user_id: string | null
           user_name: string
+          workflow_stage: string
         }
         Insert: {
+          approval_required?: boolean
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to?: string | null
           categories?: string[]
           category: string
@@ -243,12 +437,18 @@ export type Database = {
           resolution_source?: string | null
           resolved_at?: string | null
           resolved_by_ai?: boolean
+          sla_hours?: number | null
           status?: string
           title: string
           user_id?: string | null
           user_name: string
+          workflow_stage?: string
         }
         Update: {
+          approval_required?: boolean
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           assigned_to?: string | null
           categories?: string[]
           category?: string
@@ -259,10 +459,12 @@ export type Database = {
           resolution_source?: string | null
           resolved_at?: string | null
           resolved_by_ai?: boolean
+          sla_hours?: number | null
           status?: string
           title?: string
           user_id?: string | null
           user_name?: string
+          workflow_stage?: string
         }
         Relationships: []
       }
@@ -284,6 +486,188 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      workflow_approvals: {
+        Row: {
+          approver_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_name: string | null
+          decision_note: string | null
+          department: string | null
+          id: string
+          stage_id: string
+          status: string
+          ticket_id: string
+        }
+        Insert: {
+          approver_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          department?: string | null
+          id?: string
+          stage_id: string
+          status?: string
+          ticket_id: string
+        }
+        Update: {
+          approver_user_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          decision_note?: string | null
+          department?: string | null
+          id?: string
+          stage_id?: string
+          status?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_approvals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_approvals_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_history: {
+        Row: {
+          action: string
+          actor_department: string | null
+          actor_id: string | null
+          actor_name: string | null
+          comment: string | null
+          created_at: string
+          id: string
+          stage_id: string | null
+          ticket_id: string
+        }
+        Insert: {
+          action: string
+          actor_department?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          stage_id?: string | null
+          ticket_id: string
+        }
+        Update: {
+          action?: string
+          actor_department?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          comment?: string | null
+          created_at?: string
+          id?: string
+          stage_id?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_history_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_history_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stages: {
+        Row: {
+          approver_department: string | null
+          approver_kind: string | null
+          approver_user_id: string | null
+          id: string
+          name: string
+          position: number
+          template_id: string
+          type: string
+        }
+        Insert: {
+          approver_department?: string | null
+          approver_kind?: string | null
+          approver_user_id?: string | null
+          id?: string
+          name: string
+          position: number
+          template_id: string
+          type: string
+        }
+        Update: {
+          approver_department?: string | null
+          approver_kind?: string | null
+          approver_user_id?: string | null
+          id?: string
+          name?: string
+          position?: number
+          template_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_templates: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          name: string
+          trigger_keywords: string[]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          name: string
+          trigger_keywords?: string[]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          name?: string
+          trigger_keywords?: string[]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -310,7 +694,7 @@ export type Database = {
       user_department: { Args: { _uid: string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "employee" | "it_personnel"
+      app_role: "admin" | "employee" | "it_personnel" | "manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -438,7 +822,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "employee", "it_personnel"],
+      app_role: ["admin", "employee", "it_personnel", "manager"],
     },
   },
 } as const
