@@ -58,6 +58,8 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{ticket.details}</p>
           </div>
 
+          <WorkflowProgress ticketId={ticket.id} />
+
           {ticket.assignments.length > 0 && (
             <div className="rounded-xl border border-border bg-muted/30 p-4">
               <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
