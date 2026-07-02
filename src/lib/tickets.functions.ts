@@ -147,8 +147,20 @@ export const submitTicket = createServerFn({ method: "POST" })
     const { error: aerr } = await supabaseAdmin.from("ticket_assignments").insert(rows);
     if (aerr) throw new Error(aerr.message);
 
+    // Advance workflow: submitted -> ai_classified -> assigned. We stamp the
+    // intermediate stage first so the activity log shows both transitions.
+    await supabaseAdmin
+      .from("tickets")
+      .update({ workflow_stage: "ai_classified" })
+      .eq("id", row.id);
+    await supabaseAdmin
+      .from("tickets")
+      .update({ workflow_stage: "assigned" })
+      .eq("id", row.id);
+
     return { id: row.id, categories, priority };
   });
+
 
 // ----------------------------- Listings -----------------------------
 
