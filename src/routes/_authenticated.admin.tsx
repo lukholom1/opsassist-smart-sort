@@ -92,12 +92,20 @@ function AdminPage() {
                 <Users size={14} className="mr-1.5" /> Users
               </Button>
             )}
+            <Button asChild variant="outline" size="sm" className="rounded-lg border-amber-500/40 text-amber-700 hover:bg-amber-500/10">
+              <Link to="/admin/approvals">
+                <ShieldCheck size={14} className="mr-1.5" />
+                Approvals
+              </Link>
+            </Button>
+            <NotificationBell />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
               <LogOut size={14} className="mr-1.5" /> Sign out
             </Button>
+
           </div>
         </div>
       </header>
