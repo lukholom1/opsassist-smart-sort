@@ -28,7 +28,7 @@ export type WorkflowTemplate = {
 export type WorkflowApproval = {
   id: string;
   ticket_id: string;
-  stage_id: string;
+  stage_id: string | null;
   department: string | null;
   approver_user_id: string | null;
   status: "pending" | "approved" | "rejected" | "info_requested";
@@ -224,7 +224,7 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
     const { data: approvals } = await q;
     const rows = (approvals ?? []) as WorkflowApproval[];
     const ticketIds = Array.from(new Set(rows.map((r) => r.ticket_id)));
-    const stageIds = Array.from(new Set(rows.map((r) => r.stage_id)));
+    const stageIds = Array.from(new Set(rows.map((r) => r.stage_id).filter((s): s is string => !!s)));
     const [{ data: tickets }, { data: stages }] = await Promise.all([
       ticketIds.length
         ? supabaseAdmin
@@ -242,7 +242,7 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
       approvals: rows.map((a) => ({
         ...a,
         ticket: ticketById.get(a.ticket_id) ?? null,
-        stage: stageById.get(a.stage_id) ?? null,
+        stage: a.stage_id ? (stageById.get(a.stage_id) ?? null) : null,
       })),
     };
   });
@@ -316,6 +316,9 @@ export const decideApproval = createServerFn({ method: "POST" })
       return { ok: true };
     }
 
+    // Manual (stage-less) approval — no workflow to advance.
+    if (!approval.stage_id) return { ok: true };
+
     // Approved — check if all approvals for this stage are approved, then advance.
     const { data: sibling } = await supabaseAdmin
       .from("workflow_approvals")
@@ -333,6 +336,7 @@ export const decideApproval = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
 
 const CompleteOpSchema = z.object({
   ticket_id: z.string().uuid(),
@@ -467,3 +471,238 @@ async function advanceToNextStage(
     comment: `Stage: ${next.name}`,
   });
 }
+
+// ============================================================================
+// Manual (ad-hoc) approval requests — admins request approvals per-ticket
+// without a preconfigured workflow template.
+// ============================================================================
+
+const RequestManualSchema = z.object({
+  ticket_id: z.string().uuid(),
+  approvers: z
+    .array(
+      z.object({
+        department: z.string().trim().min(1).max(60).optional(),
+        user_id: z.string().uuid().optional(),
+      }),
+    )
+    .min(1)
+    .max(10),
+  note: z.string().trim().max(2000).optional(),
+});
+
+export const requestManualApprovals = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => RequestManualSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const actorName = (context.profile as any)?.full_name ?? "Admin";
+    const actorDept = (context.department as string | null) ?? null;
+
+    const rows = data.approvers.map((a) => ({
+      ticket_id: data.ticket_id,
+      stage_id: null,
+      department: a.department ?? null,
+      approver_user_id: a.user_id ?? null,
+      status: "pending" as const,
+    }));
+    const { data: inserted, error } = await supabaseAdmin
+      .from("workflow_approvals")
+      .insert(rows)
+      .select("id, department, approver_user_id");
+    if (error) throw new Error(error.message);
+
+    // Log to workflow_history so it shows in the timeline.
+    await supabaseAdmin.from("workflow_history").insert({
+      ticket_id: data.ticket_id,
+      stage_id: null,
+      action: "approval_requested",
+      actor_id: context.userId,
+      actor_name: actorName,
+      actor_department: actorDept,
+      comment:
+        (data.note ? data.note + " — " : "") +
+        "Requested approval from: " +
+        data.approvers
+          .map((a) => a.department ?? a.user_id ?? "unknown")
+          .join(", "),
+    });
+
+    // Notify approvers.
+    const notifications: any[] = [];
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("title")
+      .eq("id", data.ticket_id)
+      .maybeSingle();
+    const title = (ticket as any)?.title ?? "Ticket";
+
+    for (const a of data.approvers) {
+      if (a.user_id) {
+        notifications.push({
+          user_id: a.user_id,
+          ticket_id: data.ticket_id,
+          type: "approval_required",
+          title: `Approval requested: ${title}`,
+          body: data.note ?? "You have been asked to review this ticket.",
+          metadata: { ticket_id: data.ticket_id },
+        });
+      } else if (a.department) {
+        const { data: admins } = await supabaseAdmin
+          .from("user_roles")
+          .select("user_id, profiles!inner(department)")
+          .in("role", ["admin", "manager"] as any);
+        for (const r of (admins ?? []) as any[]) {
+          if (r.profiles?.department === a.department) {
+            notifications.push({
+              user_id: r.user_id,
+              ticket_id: data.ticket_id,
+              type: "approval_required",
+              title: `Approval requested (${a.department}): ${title}`,
+              body: data.note ?? "Your department has been asked to review this ticket.",
+              metadata: { ticket_id: data.ticket_id, department: a.department },
+            });
+          }
+        }
+      }
+    }
+    if (notifications.length) {
+      await supabaseAdmin.from("notifications").insert(notifications);
+    }
+
+    return { ok: true, approvals: inserted ?? [] };
+  });
+
+const SkipSchema = z.object({
+  ticket_id: z.string().uuid(),
+  reason: z.string().trim().max(2000).optional(),
+});
+
+export const skipWorkflow = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => SkipSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const actorName = (context.profile as any)?.full_name ?? "Admin";
+    await supabaseAdmin
+      .from("tickets")
+      .update({
+        workflow_skipped: true,
+        workflow_skipped_at: new Date().toISOString(),
+        workflow_skipped_by: context.userId,
+        workflow_skipped_reason: data.reason ?? null,
+      })
+      .eq("id", data.ticket_id);
+
+    await supabaseAdmin.from("workflow_history").insert({
+      ticket_id: data.ticket_id,
+      stage_id: null,
+      action: "workflow_skipped",
+      actor_id: context.userId,
+      actor_name: actorName,
+      actor_department: (context.department as string | null) ?? null,
+      comment: data.reason ?? "Marked as no approval required.",
+    });
+    return { ok: true };
+  });
+
+const UnskipSchema = z.object({ ticket_id: z.string().uuid() });
+export const unskipWorkflow = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => UnskipSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const actorName = (context.profile as any)?.full_name ?? "Admin";
+    await supabaseAdmin
+      .from("tickets")
+      .update({
+        workflow_skipped: false,
+        workflow_skipped_at: null,
+        workflow_skipped_by: null,
+        workflow_skipped_reason: null,
+      })
+      .eq("id", data.ticket_id);
+    await supabaseAdmin.from("workflow_history").insert({
+      ticket_id: data.ticket_id,
+      stage_id: null,
+      action: "workflow_reopened",
+      actor_id: context.userId,
+      actor_name: actorName,
+      comment: "Approval workflow re-enabled.",
+    });
+    return { ok: true };
+  });
+
+export const getTicketApprovalState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ ticket_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const [{ data: ticket }, { data: approvals }, { data: history }] = await Promise.all([
+      supabaseAdmin
+        .from("tickets")
+        .select("id, workflow_skipped, workflow_skipped_reason, workflow_skipped_at")
+        .eq("id", data.ticket_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("workflow_approvals")
+        .select("*")
+        .eq("ticket_id", data.ticket_id)
+        .order("created_at", { ascending: true }),
+      supabaseAdmin
+        .from("workflow_history")
+        .select("*")
+        .eq("ticket_id", data.ticket_id)
+        .order("created_at", { ascending: true }),
+    ]);
+    // Enrich approvers with names.
+    const userIds = Array.from(
+      new Set(
+        ((approvals ?? []) as any[])
+          .map((a) => a.approver_user_id)
+          .filter((u): u is string => !!u),
+      ),
+    );
+    let nameById = new Map<string, string>();
+    if (userIds.length) {
+      const { data: profs } = await supabaseAdmin
+        .from("profiles")
+        .select("id, full_name, email")
+        .in("id", userIds);
+      nameById = new Map(
+        (profs ?? []).map((p: any) => [p.id, p.full_name ?? p.email ?? "User"]),
+      );
+    }
+    return {
+      ticket: (ticket ?? null) as any,
+      approvals: ((approvals ?? []) as WorkflowApproval[]).map((a) => ({
+        ...a,
+        approver_name: a.approver_user_id ? (nameById.get(a.approver_user_id) ?? null) : null,
+      })),
+      history: (history ?? []) as WorkflowHistoryRow[],
+    };
+  });
+
+// Simple list of admin/manager users an admin can pick as an individual approver.
+export const listApproverCandidates = createServerFn({ method: "GET" })
+  .middleware([requireRole(["admin"])])
+  .handler(async () => {
+    const { data: roles } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, role")
+      .in("role", ["admin", "manager"] as any);
+    const ids = Array.from(new Set((roles ?? []).map((r: any) => r.user_id)));
+    if (!ids.length) return { users: [] };
+    const { data: profs } = await supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, email, department")
+      .in("id", ids);
+    const roleById = new Map((roles ?? []).map((r: any) => [r.user_id, r.role]));
+    return {
+      users: (profs ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.full_name ?? p.email ?? "User",
+        email: p.email ?? null,
+        department: p.department ?? null,
+        role: roleById.get(p.id) ?? "admin",
+      })),
+    };
+  });

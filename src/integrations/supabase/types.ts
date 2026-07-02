@@ -420,6 +420,10 @@ export type Database = {
           title: string
           user_id: string | null
           user_name: string
+          workflow_skipped: boolean
+          workflow_skipped_at: string | null
+          workflow_skipped_by: string | null
+          workflow_skipped_reason: string | null
           workflow_stage: string
         }
         Insert: {
@@ -442,6 +446,10 @@ export type Database = {
           title: string
           user_id?: string | null
           user_name: string
+          workflow_skipped?: boolean
+          workflow_skipped_at?: string | null
+          workflow_skipped_by?: string | null
+          workflow_skipped_reason?: string | null
           workflow_stage?: string
         }
         Update: {
@@ -464,6 +472,10 @@ export type Database = {
           title?: string
           user_id?: string | null
           user_name?: string
+          workflow_skipped?: boolean
+          workflow_skipped_at?: string | null
+          workflow_skipped_by?: string | null
+          workflow_skipped_reason?: string | null
           workflow_stage?: string
         }
         Relationships: []
@@ -499,7 +511,7 @@ export type Database = {
           decision_note: string | null
           department: string | null
           id: string
-          stage_id: string
+          stage_id: string | null
           status: string
           ticket_id: string
         }
@@ -512,7 +524,7 @@ export type Database = {
           decision_note?: string | null
           department?: string | null
           id?: string
-          stage_id: string
+          stage_id?: string | null
           status?: string
           ticket_id: string
         }
@@ -525,7 +537,7 @@ export type Database = {
           decision_note?: string | null
           department?: string | null
           id?: string
-          stage_id?: string
+          stage_id?: string | null
           status?: string
           ticket_id?: string
         }
