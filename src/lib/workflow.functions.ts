@@ -242,7 +242,7 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
       approvals: rows.map((a) => ({
         ...a,
         ticket: ticketById.get(a.ticket_id) ?? null,
-        stage: stageById.get(a.stage_id) ?? null,
+        stage: a.stage_id ? (stageById.get(a.stage_id) ?? null) : null,
       })),
     };
   });
