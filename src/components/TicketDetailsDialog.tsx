@@ -102,7 +102,10 @@ export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClo
               )}
             </div>
           )}
+
+          <ActivityTimeline ticketId={ticket.id} />
         </div>
+
       </DialogContent>
     </Dialog>
   );
