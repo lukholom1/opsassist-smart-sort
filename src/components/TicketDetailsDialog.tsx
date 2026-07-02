@@ -1,7 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CategoryPills, PriorityPill, StatusPill, RatingStars, elapsed } from "@/components/ticket-bits";
 import { Bot, Calendar, User, Building2 } from "lucide-react";
+import { WorkflowTracker, type WorkflowStage } from "@/components/WorkflowTracker";
+import { ActivityTimeline } from "@/components/ActivityTimeline";
 import type { AssignmentRow } from "@/lib/tickets.functions";
+
 
 type Ticket = {
   id: string;
@@ -14,9 +17,12 @@ type Ticket = {
   created_at: string;
   resolved_at: string | null;
   resolved_by_ai: boolean;
+  workflow_stage?: string | null;
+  approval_required?: boolean | null;
   assignments: AssignmentRow[];
   feedback: { rating: number; comment: string | null } | null;
 };
+
 
 export function TicketDetailsDialog({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   return (
