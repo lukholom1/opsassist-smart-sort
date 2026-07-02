@@ -28,7 +28,7 @@ export type WorkflowTemplate = {
 export type WorkflowApproval = {
   id: string;
   ticket_id: string;
-  stage_id: string;
+  stage_id: string | null;
   department: string | null;
   approver_user_id: string | null;
   status: "pending" | "approved" | "rejected" | "info_requested";
