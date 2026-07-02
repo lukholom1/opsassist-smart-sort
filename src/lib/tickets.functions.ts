@@ -863,3 +863,34 @@ export const addTicketNote = createServerFn({ method: "POST" })
     return { note: row as TicketNote };
   });
 
+// ----------------------------- Ticket activity (audit trail) -----------------------------
+
+export type TicketActivityRow = {
+  id: string;
+  ticket_id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_role: string;
+  event_type: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+};
+
+export const listTicketActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ ticket_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }): Promise<{ activity: TicketActivityRow[] }> => {
+    // Access check: same rules as notes.
+    await assertNoteAccess(data.ticket_id, context.userId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("ticket_activity")
+      .select("*")
+      .eq("ticket_id", data.ticket_id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return { activity: (rows ?? []) as TicketActivityRow[] };
+  });
+
+
