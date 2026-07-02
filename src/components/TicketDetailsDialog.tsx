@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { CategoryPills, PriorityPill, StatusPill, RatingStars, elapsed } from "@/components/ticket-bits";
+import { WorkflowProgress } from "@/components/WorkflowProgress";
 import { Bot, Calendar, User, Building2 } from "lucide-react";
 import type { AssignmentRow } from "@/lib/tickets.functions";
 
