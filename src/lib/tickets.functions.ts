@@ -890,7 +890,12 @@ export const listTicketActivity = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);
-    return { activity: (rows ?? []) as TicketActivityRow[] };
+    const activity: TicketActivityRow[] = (rows ?? []).map((r) => ({
+      ...(r as Omit<TicketActivityRow, "metadata">),
+      metadata: JSON.stringify((r as { metadata: unknown }).metadata ?? {}),
+    }));
+    return { activity };
   });
+
 
 
