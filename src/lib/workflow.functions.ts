@@ -224,7 +224,7 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
     const { data: approvals } = await q;
     const rows = (approvals ?? []) as WorkflowApproval[];
     const ticketIds = Array.from(new Set(rows.map((r) => r.ticket_id)));
-    const stageIds = Array.from(new Set(rows.map((r) => r.stage_id)));
+    const stageIds = Array.from(new Set(rows.map((r) => r.stage_id).filter((s): s is string => !!s)));
     const [{ data: tickets }, { data: stages }] = await Promise.all([
       ticketIds.length
         ? supabaseAdmin
