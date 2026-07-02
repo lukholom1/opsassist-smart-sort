@@ -35,6 +35,8 @@ import {
 // NotesDialog still used elsewhere; admin uses it directly. Chatbot replaces it for users.
 import { ChatbotDialog } from "@/components/ChatbotDialog";
 import { useNotesRealtime } from "@/hooks/use-notes-realtime";
+import { NotificationBell } from "@/components/NotificationBell";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
