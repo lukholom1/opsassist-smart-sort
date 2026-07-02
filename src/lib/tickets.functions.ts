@@ -147,8 +147,20 @@ export const submitTicket = createServerFn({ method: "POST" })
     const { error: aerr } = await supabaseAdmin.from("ticket_assignments").insert(rows);
     if (aerr) throw new Error(aerr.message);
 
+    // Advance workflow: submitted -> ai_classified -> assigned. We stamp the
+    // intermediate stage first so the activity log shows both transitions.
+    await supabaseAdmin
+      .from("tickets")
+      .update({ workflow_stage: "ai_classified" })
+      .eq("id", row.id);
+    await supabaseAdmin
+      .from("tickets")
+      .update({ workflow_stage: "assigned" })
+      .eq("id", row.id);
+
     return { id: row.id, categories, priority };
   });
+
 
 // ----------------------------- Listings -----------------------------
 
@@ -850,4 +862,40 @@ export const addTicketNote = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { note: row as TicketNote };
   });
+
+// ----------------------------- Ticket activity (audit trail) -----------------------------
+
+export type TicketActivityRow = {
+  id: string;
+  ticket_id: string;
+  actor_id: string | null;
+  actor_name: string;
+  actor_role: string;
+  event_type: string;
+  description: string;
+  metadata: string;
+  created_at: string;
+};
+
+export const listTicketActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ ticket_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }): Promise<{ activity: TicketActivityRow[] }> => {
+    // Access check: same rules as notes.
+    await assertNoteAccess(data.ticket_id, context.userId);
+    const { data: rows, error } = await supabaseAdmin
+      .from("ticket_activity")
+      .select("*")
+      .eq("ticket_id", data.ticket_id)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    const activity: TicketActivityRow[] = (rows ?? []).map((r) => ({
+      ...(r as Omit<TicketActivityRow, "metadata">),
+      metadata: JSON.stringify((r as { metadata: unknown }).metadata ?? {}),
+    }));
+    return { activity };
+  });
+
+
 
