@@ -232,7 +232,7 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
       ticketIds.length
         ? supabaseAdmin
             .from("tickets")
-            .select("id, title, user_name, priority, created_at, categories")
+            .select("id, title, details, user_name, priority, created_at, categories, status")
             .in("id", ticketIds)
         : Promise.resolve({ data: [] as unknown[] }),
       stageIds.length
