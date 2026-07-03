@@ -104,16 +104,8 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
     load();
   }, [load]);
 
-  async function openPicker() {
+  function openPicker() {
     setPickerOpen(true);
-    if (candidates.length === 0) {
-      try {
-        const r = await listCandFn();
-        setCandidates(r.users as Candidate[]);
-      } catch {
-        // ignore
-      }
-    }
   }
 
   function toggleDept(d: string) {
@@ -124,31 +116,25 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
       return s;
     });
   }
-  function toggleUser(u: string) {
-    setSelectedUsers((prev) => {
-      const s = new Set(prev);
-      if (s.has(u)) s.delete(u);
-      else s.add(u);
-      return s;
-    });
-  }
 
   async function submitRequest() {
-    const approvers = [
-      ...Array.from(selectedDepts).map((d) => ({ department: d })),
-      ...Array.from(selectedUsers).map((u) => ({ user_id: u })),
-    ];
-    if (approvers.length === 0) {
-      toast.error("Pick at least one approver.");
+    const departments = Array.from(selectedDepts);
+    if (departments.length === 0) {
+      toast.error("Pick at least one department.");
+      return;
+    }
+    if (!note.trim()) {
+      toast.error("Please add a comment explaining why approval is needed.");
       return;
     }
     setBusy(true);
     try {
-      await requestFn({ data: { ticket_id: ticketId, approvers, note: note || undefined } });
+      await requestFn({
+        data: { ticket_id: ticketId, departments, note: note.trim() },
+      });
       toast.success("Approval requested");
       setPickerOpen(false);
       setSelectedDepts(new Set());
-      setSelectedUsers(new Set());
       setNote("");
       await load();
     } catch (e: any) {
@@ -157,6 +143,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
       setBusy(false);
     }
   }
+
 
   async function submitSkip() {
     setBusy(true);
