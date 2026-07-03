@@ -370,7 +370,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                   <div className="mt-2 grid gap-2">
                     <Textarea
                       rows={2}
-                      placeholder="Optional comment…"
+                      placeholder="Add a comment (required when rejecting)…"
                       value={decideNote[a.id] ?? ""}
                       onChange={(e) =>
                         setDecideNote((n) => ({ ...n, [a.id]: e.target.value }))
