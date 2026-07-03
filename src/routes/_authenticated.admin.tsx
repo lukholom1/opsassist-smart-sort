@@ -99,6 +99,7 @@ function AdminPage() {
                 <Users size={14} className="mr-1.5" /> Users
               </Button>
             )}
+            <NotificationsBell />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>
