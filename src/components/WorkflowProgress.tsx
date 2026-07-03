@@ -429,40 +429,20 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                 ))}
               </div>
             </div>
-            {candidates.length > 0 && (
-              <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Or specific people
-                </div>
-                <div className="max-h-40 overflow-y-auto rounded border border-border p-2">
-                  {candidates.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex cursor-pointer items-center gap-2 py-1 text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedUsers.has(c.id)}
-                        onCheckedChange={() => toggleUser(c.id)}
-                      />
-                      <span className="font-medium">{c.name}</span>
-                      {c.department && (
-                        <span className="text-xs text-muted-foreground">({c.department})</span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
             <div>
               <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Note (optional)
+                Reason for approval request <span className="text-destructive">*</span>
               </Label>
               <Textarea
-                rows={2}
+                rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Why is approval needed?"
+                placeholder="Explain why this ticket needs approval from the selected department(s)…"
+                required
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                The receiving department will see this comment alongside the full ticket.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setPickerOpen(false)} disabled={busy}>
