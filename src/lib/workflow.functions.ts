@@ -590,10 +590,11 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
 
     const { data: admins } = await supabaseAdmin
       .from("user_roles")
-      .select("user_id, profiles!inner(department)")
+      .select("user_id, profiles!inner(department, email, full_name)")
       .in("role", ["admin", "manager"] as any);
 
     const notifications: any[] = [];
+    const emailTargets: { email: string; name: string | null; department: string }[] = [];
     for (const d of data.departments) {
       for (const r of (admins ?? []) as any[]) {
         if (r.profiles?.department === d && r.user_id !== context.userId) {
@@ -605,12 +606,34 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
             body: data.note,
             metadata: { ticket_id: data.ticket_id, department: d, requested_by: actorName },
           });
+          if (r.profiles?.email) {
+            emailTargets.push({
+              email: r.profiles.email,
+              name: r.profiles.full_name ?? null,
+              department: d,
+            });
+          }
         }
       }
     }
     if (notifications.length) {
       await supabaseAdmin.from("notifications").insert(notifications);
     }
+
+    // Fire-and-forget approval-request emails.
+    await Promise.all(
+      emailTargets.map((t) =>
+        sendNotificationEmail({
+          to: t.email,
+          subject: `Approval requested (${t.department}): ${title}`,
+          heading: "New approval request",
+          intro: `${actorName} has requested ${t.department} department approval on the ticket below. Please review and take action in OpsAssist.`,
+          ticketTitle: title,
+          body: data.note,
+          accent: "warning",
+        }).catch(() => ({ sent: false })),
+      ),
+    );
 
     return { ok: true, approvals: inserted ?? [] };
   });
