@@ -174,13 +174,18 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   }
 
   async function decide(approvalId: string, decision: "approve" | "reject" | "info") {
+    const comment = (decideNote[approvalId] ?? "").trim();
+    if (decision === "reject" && !comment) {
+      toast.error("Please provide a reason before rejecting.");
+      return;
+    }
     setBusy(true);
     try {
       await decideFn({
         data: {
           approval_id: approvalId,
           decision,
-          comment: decideNote[approvalId] || undefined,
+          comment: comment || undefined,
         },
       });
       toast.success(
