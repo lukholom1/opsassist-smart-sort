@@ -60,15 +60,22 @@ function ApprovalsPage() {
   }, []);
 
   async function decide(id: string, decision: "approve" | "reject" | "info") {
+    const comment = (comments[id] ?? "").trim();
+    if (decision === "reject" && !comment) {
+      toast.error("Please provide a reason before rejecting.");
+      return;
+    }
     setBusyId(id);
     try {
-      await decideFn({ data: { approval_id: id, decision, comment: comments[id] } });
+      await decideFn({
+        data: { approval_id: id, decision, comment: comment || undefined },
+      });
       toast.success(
         decision === "approve"
-          ? "Approved — workflow advanced"
+          ? "Approved — requester notified"
           : decision === "reject"
-            ? "Rejected"
-            : "Info requested",
+            ? "Rejected — requester notified with reason"
+            : "Info requested — requester notified",
       );
       await refresh();
     } catch (e: any) {
