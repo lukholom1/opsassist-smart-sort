@@ -250,11 +250,21 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
     };
   });
 
-const DecisionSchema = z.object({
-  approval_id: z.string().uuid(),
-  decision: z.enum(["approve", "reject", "info"]),
-  comment: z.string().trim().max(2000).optional(),
-});
+const DecisionSchema = z
+  .object({
+    approval_id: z.string().uuid(),
+    decision: z.enum(["approve", "reject", "info"]),
+    comment: z.string().trim().max(2000).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.decision === "reject" && (!val.comment || val.comment.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["comment"],
+        message: "A reason is required when rejecting an approval.",
+      });
+    }
+  });
 
 export const decideApproval = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
@@ -306,6 +316,51 @@ export const decideApproval = createServerFn({ method: "POST" })
       actor_department: dept,
       comment: data.comment ?? null,
     });
+
+    // Notify the requester of the outcome.
+    const requesterId = (approval as any).requested_by as string | null;
+    if (requesterId && data.decision !== "info") {
+      const { data: ticket } = await supabaseAdmin
+        .from("tickets")
+        .select("title")
+        .eq("id", approval.ticket_id)
+        .maybeSingle();
+      const title = (ticket as any)?.title ?? "Ticket";
+      const isApprove = data.decision === "approve";
+      await supabaseAdmin.from("notifications").insert({
+        user_id: requesterId,
+        ticket_id: approval.ticket_id,
+        type: isApprove ? "approval_granted" : "approval_denied",
+        title: `${isApprove ? "Approval granted" : "Approval denied"}${
+          approval.department ? ` (${approval.department})` : ""
+        }: ${title}`,
+        body:
+          data.comment ??
+          (isApprove
+            ? `${actorName} approved your request.`
+            : `${actorName} denied your request.`),
+        metadata: {
+          ticket_id: approval.ticket_id,
+          approval_id: approval.id,
+          decision: data.decision,
+        },
+      });
+    } else if (requesterId && data.decision === "info") {
+      const { data: ticket } = await supabaseAdmin
+        .from("tickets")
+        .select("title")
+        .eq("id", approval.ticket_id)
+        .maybeSingle();
+      const title = (ticket as any)?.title ?? "Ticket";
+      await supabaseAdmin.from("notifications").insert({
+        user_id: requesterId,
+        ticket_id: approval.ticket_id,
+        type: "approval_info_requested",
+        title: `More info needed${approval.department ? ` (${approval.department})` : ""}: ${title}`,
+        body: data.comment ?? `${actorName} requested more information.`,
+        metadata: { ticket_id: approval.ticket_id, approval_id: approval.id },
+      });
+    }
 
     if (data.decision === "info") {
       return { ok: true };
