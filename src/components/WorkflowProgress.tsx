@@ -8,7 +8,6 @@ import {
   skipWorkflow,
   unskipWorkflow,
   decideApproval,
-  listApproverCandidates,
   type WorkflowStage,
   type WorkflowApproval,
   type WorkflowHistoryRow,
@@ -58,12 +57,9 @@ type ManualState = {
   history: WorkflowHistoryRow[];
 };
 
-type Candidate = { id: string; name: string; email: string | null; department: string | null };
-
 export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   const getWorkflowFn = useServerFn(getTicketWorkflow);
   const getManualFn = useServerFn(getTicketApprovalState);
-  const listCandFn = useServerFn(listApproverCandidates);
   const requestFn = useServerFn(requestManualApprovals);
   const skipFn = useServerFn(skipWorkflow);
   const unskipFn = useServerFn(unskipWorkflow);
@@ -79,9 +75,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   // Request-approval dialog state.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedDepts, setSelectedDepts] = useState<Set<string>>(new Set());
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   // Skip dialog state.
   const [skipOpen, setSkipOpen] = useState(false);
@@ -110,16 +104,8 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
     load();
   }, [load]);
 
-  async function openPicker() {
+  function openPicker() {
     setPickerOpen(true);
-    if (candidates.length === 0) {
-      try {
-        const r = await listCandFn();
-        setCandidates(r.users as Candidate[]);
-      } catch {
-        // ignore
-      }
-    }
   }
 
   function toggleDept(d: string) {
@@ -130,31 +116,25 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
       return s;
     });
   }
-  function toggleUser(u: string) {
-    setSelectedUsers((prev) => {
-      const s = new Set(prev);
-      if (s.has(u)) s.delete(u);
-      else s.add(u);
-      return s;
-    });
-  }
 
   async function submitRequest() {
-    const approvers = [
-      ...Array.from(selectedDepts).map((d) => ({ department: d })),
-      ...Array.from(selectedUsers).map((u) => ({ user_id: u })),
-    ];
-    if (approvers.length === 0) {
-      toast.error("Pick at least one approver.");
+    const departments = Array.from(selectedDepts);
+    if (departments.length === 0) {
+      toast.error("Pick at least one department.");
+      return;
+    }
+    if (!note.trim()) {
+      toast.error("Please add a comment explaining why approval is needed.");
       return;
     }
     setBusy(true);
     try {
-      await requestFn({ data: { ticket_id: ticketId, approvers, note: note || undefined } });
+      await requestFn({
+        data: { ticket_id: ticketId, departments, note: note.trim() },
+      });
       toast.success("Approval requested");
       setPickerOpen(false);
       setSelectedDepts(new Set());
-      setSelectedUsers(new Set());
       setNote("");
       await load();
     } catch (e: any) {
@@ -163,6 +143,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
       setBusy(false);
     }
   }
+
 
   async function submitSkip() {
     setBusy(true);
@@ -193,13 +174,18 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   }
 
   async function decide(approvalId: string, decision: "approve" | "reject" | "info") {
+    const comment = (decideNote[approvalId] ?? "").trim();
+    if (decision === "reject" && !comment) {
+      toast.error("Please provide a reason before rejecting.");
+      return;
+    }
     setBusy(true);
     try {
       await decideFn({
         data: {
           approval_id: approvalId,
           decision,
-          comment: decideNote[approvalId] || undefined,
+          comment: comment || undefined,
         },
       });
       toast.success(
@@ -345,11 +331,37 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                   </span>
                 </div>
 
+                {a.request_note && (
+                  <div className="mt-2 rounded border border-border/60 bg-background/50 px-2 py-1.5 text-xs">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Reason for request
+                      {a.requested_by_name ? ` · ${a.requested_by_name}` : ""}
+                    </div>
+                    <p className="mt-0.5 text-foreground">{a.request_note}</p>
+                  </div>
+                )}
+
                 {a.decision_note && (
-                  <p className="mt-1 text-xs text-muted-foreground">“{a.decision_note}”</p>
+                  <div
+                    className={cn(
+                      "mt-2 rounded border px-2 py-1.5 text-xs",
+                      a.status === "rejected"
+                        ? "border-destructive/40 bg-destructive/5"
+                        : "border-border/60 bg-background/50",
+                    )}
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {a.status === "rejected"
+                        ? "Reason for rejection"
+                        : a.status === "info_requested"
+                          ? "Info requested"
+                          : "Decision note"}
+                    </div>
+                    <p className="mt-0.5 text-foreground">{a.decision_note}</p>
+                  </div>
                 )}
                 {a.decided_by_name && a.decided_at && (
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     by {a.decided_by_name} · {new Date(a.decided_at).toLocaleString()}
                   </p>
                 )}
@@ -358,7 +370,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                   <div className="mt-2 grid gap-2">
                     <Textarea
                       rows={2}
-                      placeholder="Optional comment…"
+                      placeholder="Add a comment (required when rejecting)…"
                       value={decideNote[a.id] ?? ""}
                       onChange={(e) =>
                         setDecideNote((n) => ({ ...n, [a.id]: e.target.value }))
@@ -448,40 +460,20 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                 ))}
               </div>
             </div>
-            {candidates.length > 0 && (
-              <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Or specific people
-                </div>
-                <div className="max-h-40 overflow-y-auto rounded border border-border p-2">
-                  {candidates.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex cursor-pointer items-center gap-2 py-1 text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedUsers.has(c.id)}
-                        onCheckedChange={() => toggleUser(c.id)}
-                      />
-                      <span className="font-medium">{c.name}</span>
-                      {c.department && (
-                        <span className="text-xs text-muted-foreground">({c.department})</span>
-                      )}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
             <div>
               <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Note (optional)
+                Reason for approval request <span className="text-destructive">*</span>
               </Label>
               <Textarea
-                rows={2}
+                rows={3}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="Why is approval needed?"
+                placeholder="Explain why this ticket needs approval from the selected department(s)…"
+                required
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                The receiving department will see this comment alongside the full ticket.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button size="sm" variant="ghost" onClick={() => setPickerOpen(false)} disabled={busy}>

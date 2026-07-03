@@ -511,6 +511,9 @@ export type Database = {
           decision_note: string | null
           department: string | null
           id: string
+          request_note: string | null
+          requested_by: string | null
+          requested_by_name: string | null
           stage_id: string | null
           status: string
           ticket_id: string
@@ -524,6 +527,9 @@ export type Database = {
           decision_note?: string | null
           department?: string | null
           id?: string
+          request_note?: string | null
+          requested_by?: string | null
+          requested_by_name?: string | null
           stage_id?: string | null
           status?: string
           ticket_id: string
@@ -537,6 +543,9 @@ export type Database = {
           decision_note?: string | null
           department?: string | null
           id?: string
+          request_note?: string | null
+          requested_by?: string | null
+          requested_by_name?: string | null
           stage_id?: string | null
           status?: string
           ticket_id?: string

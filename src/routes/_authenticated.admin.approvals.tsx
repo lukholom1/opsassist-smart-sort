@@ -60,15 +60,22 @@ function ApprovalsPage() {
   }, []);
 
   async function decide(id: string, decision: "approve" | "reject" | "info") {
+    const comment = (comments[id] ?? "").trim();
+    if (decision === "reject" && !comment) {
+      toast.error("Please provide a reason before rejecting.");
+      return;
+    }
     setBusyId(id);
     try {
-      await decideFn({ data: { approval_id: id, decision, comment: comments[id] } });
+      await decideFn({
+        data: { approval_id: id, decision, comment: comment || undefined },
+      });
       toast.success(
         decision === "approve"
-          ? "Approved — workflow advanced"
+          ? "Approved — requester notified"
           : decision === "reject"
-            ? "Rejected"
-            : "Info requested",
+            ? "Rejected — requester notified with reason"
+            : "Info requested — requester notified",
       );
       await refresh();
     } catch (e: any) {
@@ -143,15 +150,56 @@ function ApprovalsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="grid gap-3">
-                    <Textarea
-                      placeholder="Optional comment for the requester…"
-                      value={comments[a.id] ?? ""}
-                      onChange={(e) =>
-                        setComments((c) => ({ ...c, [a.id]: e.target.value }))
-                      }
-                      rows={2}
-                    />
+                  <CardContent className="grid gap-4">
+                    {t?.details && (
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Ticket details
+                        </div>
+                        <p className="whitespace-pre-wrap rounded-md border border-border/60 bg-muted/30 p-3 text-sm text-foreground">
+                          {t.details}
+                        </p>
+                      </div>
+                    )}
+
+                    {Array.isArray(t?.categories) && t.categories.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {t.categories.map((c: string) => (
+                          <Badge key={c} variant="secondary" className="text-[10px]">
+                            {c}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {(a as any).request_note && (
+                      <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+                        <div className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+                          Reason for approval request
+                          {(a as any).requested_by_name
+                            ? ` · ${(a as any).requested_by_name}`
+                            : ""}
+                        </div>
+                        <p className="text-sm text-foreground">
+                          {(a as any).request_note}
+                        </p>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Your decision comment{" "}
+                        <span className="text-destructive">*  required if rejecting</span>
+                      </div>
+                      <Textarea
+                        placeholder="Add a comment. A reason is required when rejecting…"
+                        value={comments[a.id] ?? ""}
+                        onChange={(e) =>
+                          setComments((c) => ({ ...c, [a.id]: e.target.value }))
+                        }
+                        rows={3}
+                      />
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => decide(a.id, "approve")}
