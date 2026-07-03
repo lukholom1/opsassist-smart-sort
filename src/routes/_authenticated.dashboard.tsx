@@ -117,6 +117,7 @@ function DashboardPage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Logo />
           <div className="flex items-center gap-3">
+            <NotificationsBell />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               Hi, <span className="font-medium text-foreground">{fullName ?? "there"}</span>
             </span>
