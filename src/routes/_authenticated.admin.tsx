@@ -12,6 +12,7 @@ import { getAdminAnalytics } from "@/lib/analytics.functions";
 import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ function AdminPage() {
                 <Users size={14} className="mr-1.5" /> Users
               </Button>
             )}
+            <NotificationsBell />
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>

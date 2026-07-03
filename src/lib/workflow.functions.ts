@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { sendNotificationEmail } from "./email.server";
 
 export type WorkflowStage = {
   id: string;
@@ -317,49 +318,78 @@ export const decideApproval = createServerFn({ method: "POST" })
       comment: data.comment ?? null,
     });
 
-    // Notify the requester of the outcome.
+    // Notify the requester of the outcome (in-app + email).
     const requesterId = (approval as any).requested_by as string | null;
-    if (requesterId && data.decision !== "info") {
-      const { data: ticket } = await supabaseAdmin
-        .from("tickets")
-        .select("title")
-        .eq("id", approval.ticket_id)
-        .maybeSingle();
+    if (requesterId) {
+      const [{ data: ticket }, { data: requester }] = await Promise.all([
+        supabaseAdmin
+          .from("tickets")
+          .select("title")
+          .eq("id", approval.ticket_id)
+          .maybeSingle(),
+        supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", requesterId)
+          .maybeSingle(),
+      ]);
       const title = (ticket as any)?.title ?? "Ticket";
+      const deptTag = approval.department ? ` (${approval.department})` : "";
       const isApprove = data.decision === "approve";
+      const isReject = data.decision === "reject";
+      const notifType = isApprove
+        ? "approval_granted"
+        : isReject
+          ? "approval_denied"
+          : "approval_info_requested";
+      const notifTitle = isApprove
+        ? `Approval granted${deptTag}: ${title}`
+        : isReject
+          ? `Approval denied${deptTag}: ${title}`
+          : `More info needed${deptTag}: ${title}`;
+      const notifBody =
+        data.comment ??
+        (isApprove
+          ? `${actorName} approved your request.`
+          : isReject
+            ? `${actorName} denied your request.`
+            : `${actorName} requested more information.`);
+
       await supabaseAdmin.from("notifications").insert({
         user_id: requesterId,
         ticket_id: approval.ticket_id,
-        type: isApprove ? "approval_granted" : "approval_denied",
-        title: `${isApprove ? "Approval granted" : "Approval denied"}${
-          approval.department ? ` (${approval.department})` : ""
-        }: ${title}`,
-        body:
-          data.comment ??
-          (isApprove
-            ? `${actorName} approved your request.`
-            : `${actorName} denied your request.`),
+        type: notifType,
+        title: notifTitle,
+        body: notifBody,
         metadata: {
           ticket_id: approval.ticket_id,
           approval_id: approval.id,
           decision: data.decision,
         },
       });
-    } else if (requesterId && data.decision === "info") {
-      const { data: ticket } = await supabaseAdmin
-        .from("tickets")
-        .select("title")
-        .eq("id", approval.ticket_id)
-        .maybeSingle();
-      const title = (ticket as any)?.title ?? "Ticket";
-      await supabaseAdmin.from("notifications").insert({
-        user_id: requesterId,
-        ticket_id: approval.ticket_id,
-        type: "approval_info_requested",
-        title: `More info needed${approval.department ? ` (${approval.department})` : ""}: ${title}`,
-        body: data.comment ?? `${actorName} requested more information.`,
-        metadata: { ticket_id: approval.ticket_id, approval_id: approval.id },
-      });
+
+      const email = (requester as any)?.email as string | undefined;
+      if (email) {
+        await sendNotificationEmail({
+          to: email,
+          subject: notifTitle,
+          heading: isApprove
+            ? "Your approval request was granted"
+            : isReject
+              ? "Your approval request was denied"
+              : "More information requested",
+          intro: `${actorName}${approval.department ? ` (${approval.department})` : ""} ${
+            isApprove
+              ? "approved your request."
+              : isReject
+                ? "denied your request."
+                : "asked for more information on your request."
+          }`,
+          ticketTitle: title,
+          body: data.comment ?? undefined,
+          accent: isApprove ? "success" : isReject ? "danger" : "primary",
+        }).catch(() => ({ sent: false }));
+      }
     }
 
     if (data.decision === "info") {
@@ -589,10 +619,11 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
 
     const { data: admins } = await supabaseAdmin
       .from("user_roles")
-      .select("user_id, profiles!inner(department)")
+      .select("user_id, profiles!inner(department, email, full_name)")
       .in("role", ["admin", "manager"] as any);
 
     const notifications: any[] = [];
+    const emailTargets: { email: string; name: string | null; department: string }[] = [];
     for (const d of data.departments) {
       for (const r of (admins ?? []) as any[]) {
         if (r.profiles?.department === d && r.user_id !== context.userId) {
@@ -604,12 +635,34 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
             body: data.note,
             metadata: { ticket_id: data.ticket_id, department: d, requested_by: actorName },
           });
+          if (r.profiles?.email) {
+            emailTargets.push({
+              email: r.profiles.email,
+              name: r.profiles.full_name ?? null,
+              department: d,
+            });
+          }
         }
       }
     }
     if (notifications.length) {
       await supabaseAdmin.from("notifications").insert(notifications);
     }
+
+    // Fire-and-forget approval-request emails.
+    await Promise.all(
+      emailTargets.map((t) =>
+        sendNotificationEmail({
+          to: t.email,
+          subject: `Approval requested (${t.department}): ${title}`,
+          heading: "New approval request",
+          intro: `${actorName} has requested ${t.department} department approval on the ticket below. Please review and take action in OpsAssist.`,
+          ticketTitle: title,
+          body: data.note,
+          accent: "warning",
+        }).catch(() => ({ sent: false })),
+      ),
+    );
 
     return { ok: true, approvals: inserted ?? [] };
   });
