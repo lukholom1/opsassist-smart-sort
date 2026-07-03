@@ -537,16 +537,12 @@ async function advanceToNextStage(
 
 const RequestManualSchema = z.object({
   ticket_id: z.string().uuid(),
-  approvers: z
-    .array(
-      z.object({
-        department: z.string().trim().min(1).max(60).optional(),
-        user_id: z.string().uuid().optional(),
-      }),
-    )
-    .min(1)
-    .max(10),
-  note: z.string().trim().max(2000).optional(),
+  departments: z.array(z.string().trim().min(1).max(60)).min(1).max(10),
+  note: z
+    .string()
+    .trim()
+    .min(1, "Please explain why approval is being requested.")
+    .max(2000),
 });
 
 export const requestManualApprovals = createServerFn({ method: "POST" })
@@ -556,17 +552,20 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
     const actorName = (context.profile as any)?.full_name ?? "Admin";
     const actorDept = (context.department as string | null) ?? null;
 
-    const rows = data.approvers.map((a) => ({
+    const rows = data.departments.map((d) => ({
       ticket_id: data.ticket_id,
       stage_id: null,
-      department: a.department ?? null,
-      approver_user_id: a.user_id ?? null,
+      department: d,
+      approver_user_id: null,
       status: "pending" as const,
+      request_note: data.note,
+      requested_by: context.userId,
+      requested_by_name: actorName,
     }));
     const { data: inserted, error } = await supabaseAdmin
       .from("workflow_approvals")
-      .insert(rows)
-      .select("id, department, approver_user_id");
+      .insert(rows as any)
+      .select("id, department");
     if (error) throw new Error(error.message);
 
     // Log to workflow_history so it shows in the timeline.
@@ -577,16 +576,10 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
       actor_id: context.userId,
       actor_name: actorName,
       actor_department: actorDept,
-      comment:
-        (data.note ? data.note + " — " : "") +
-        "Requested approval from: " +
-        data.approvers
-          .map((a) => a.department ?? a.user_id ?? "unknown")
-          .join(", "),
+      comment: `${data.note} — Requested approval from: ${data.departments.join(", ")}`,
     });
 
-    // Notify approvers.
-    const notifications: any[] = [];
+    // Notify approvers (all admins/managers of the target departments).
     const { data: ticket } = await supabaseAdmin
       .from("tickets")
       .select("title")
@@ -594,32 +587,23 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
       .maybeSingle();
     const title = (ticket as any)?.title ?? "Ticket";
 
-    for (const a of data.approvers) {
-      if (a.user_id) {
-        notifications.push({
-          user_id: a.user_id,
-          ticket_id: data.ticket_id,
-          type: "approval_required",
-          title: `Approval requested: ${title}`,
-          body: data.note ?? "You have been asked to review this ticket.",
-          metadata: { ticket_id: data.ticket_id },
-        });
-      } else if (a.department) {
-        const { data: admins } = await supabaseAdmin
-          .from("user_roles")
-          .select("user_id, profiles!inner(department)")
-          .in("role", ["admin", "manager"] as any);
-        for (const r of (admins ?? []) as any[]) {
-          if (r.profiles?.department === a.department) {
-            notifications.push({
-              user_id: r.user_id,
-              ticket_id: data.ticket_id,
-              type: "approval_required",
-              title: `Approval requested (${a.department}): ${title}`,
-              body: data.note ?? "Your department has been asked to review this ticket.",
-              metadata: { ticket_id: data.ticket_id, department: a.department },
-            });
-          }
+    const { data: admins } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, profiles!inner(department)")
+      .in("role", ["admin", "manager"] as any);
+
+    const notifications: any[] = [];
+    for (const d of data.departments) {
+      for (const r of (admins ?? []) as any[]) {
+        if (r.profiles?.department === d && r.user_id !== context.userId) {
+          notifications.push({
+            user_id: r.user_id,
+            ticket_id: data.ticket_id,
+            type: "approval_required",
+            title: `Approval requested (${d}): ${title}`,
+            body: data.note,
+            metadata: { ticket_id: data.ticket_id, department: d, requested_by: actorName },
+          });
         }
       }
     }
