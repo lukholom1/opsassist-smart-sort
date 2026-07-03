@@ -37,6 +37,9 @@ export type WorkflowApproval = {
   decided_by_name: string | null;
   decided_at: string | null;
   created_at: string;
+  request_note: string | null;
+  requested_by: string | null;
+  requested_by_name: string | null;
 };
 
 export type WorkflowHistoryRow = {
