@@ -12,6 +12,7 @@ import { getAdminAnalytics } from "@/lib/analytics.functions";
 import { AdminCharts } from "@/components/AdminCharts";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
+import { NotificationsBell } from "@/components/NotificationsBell";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
