@@ -331,11 +331,37 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
                   </span>
                 </div>
 
+                {a.request_note && (
+                  <div className="mt-2 rounded border border-border/60 bg-background/50 px-2 py-1.5 text-xs">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Reason for request
+                      {a.requested_by_name ? ` · ${a.requested_by_name}` : ""}
+                    </div>
+                    <p className="mt-0.5 text-foreground">{a.request_note}</p>
+                  </div>
+                )}
+
                 {a.decision_note && (
-                  <p className="mt-1 text-xs text-muted-foreground">“{a.decision_note}”</p>
+                  <div
+                    className={cn(
+                      "mt-2 rounded border px-2 py-1.5 text-xs",
+                      a.status === "rejected"
+                        ? "border-destructive/40 bg-destructive/5"
+                        : "border-border/60 bg-background/50",
+                    )}
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {a.status === "rejected"
+                        ? "Reason for rejection"
+                        : a.status === "info_requested"
+                          ? "Info requested"
+                          : "Decision note"}
+                    </div>
+                    <p className="mt-0.5 text-foreground">{a.decision_note}</p>
+                  </div>
                 )}
                 {a.decided_by_name && a.decided_at && (
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     by {a.decided_by_name} · {new Date(a.decided_at).toLocaleString()}
                   </p>
                 )}
