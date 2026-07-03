@@ -57,12 +57,9 @@ type ManualState = {
   history: WorkflowHistoryRow[];
 };
 
-type Candidate = { id: string; name: string; email: string | null; department: string | null };
-
 export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   const getWorkflowFn = useServerFn(getTicketWorkflow);
   const getManualFn = useServerFn(getTicketApprovalState);
-  const listCandFn = useServerFn(listApproverCandidates);
   const requestFn = useServerFn(requestManualApprovals);
   const skipFn = useServerFn(skipWorkflow);
   const unskipFn = useServerFn(unskipWorkflow);
@@ -78,9 +75,7 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   // Request-approval dialog state.
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedDepts, setSelectedDepts] = useState<Set<string>>(new Set());
-  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   // Skip dialog state.
   const [skipOpen, setSkipOpen] = useState(false);
