@@ -505,6 +505,28 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       body,
     });
 
+    // Email the new assignee about the reassignment (fire-and-forget).
+    if (newAssignee) {
+      const [{ data: assignee }, { data: full }] = await Promise.all([
+        supabaseAdmin.from("profiles").select("email, full_name").eq("id", newAssignee).maybeSingle(),
+        supabaseAdmin
+          .from("tickets")
+          .select("id, title, category, categories, priority, status, created_at")
+          .eq("id", current.ticket_id)
+          .maybeSingle(),
+      ]);
+      if (assignee?.email && full) {
+        void sendTicketEmailSafe({
+          event: "assigned",
+          to: assignee.email,
+          recipientName: assignee.full_name ?? "Team member",
+          ticket: full,
+          department: data.new_department,
+          assigneeName: assignee.full_name ?? null,
+        });
+      }
+    }
+
     return { ok: true };
   });
 
