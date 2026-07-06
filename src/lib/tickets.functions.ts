@@ -571,8 +571,13 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
       .select("id, title, category, categories, priority, status, created_at")
       .eq("id", data.id)
       .maybeSingle();
-    const requesterEmail = context.profile?.email as string | undefined;
-    const requesterName = context.profile?.full_name ?? "there";
+    const { data: requesterProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const requesterEmail = requesterProfile?.email as string | undefined;
+    const requesterName = requesterProfile?.full_name ?? "there";
     if (requesterEmail && ticket) {
       const r = await sendTicketEmailSafe({
         event: "completed",
