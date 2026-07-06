@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -301,7 +302,12 @@ function NewTicketDialog({
     setLoading(true);
     setError(null);
     try {
-      await submit({ data: { title, details } });
+      const r = await submit({ data: { title, details } });
+      if (r?.emailSent) {
+        toast.success("Ticket submitted", { description: "Email notification sent successfully." });
+      } else {
+        toast.success("Ticket submitted", { description: "Ticket created, but email could not be sent." });
+      }
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit");
@@ -406,7 +412,12 @@ function AiSupportDialog({
   async function handleResolved() {
     setResolving(true);
     try {
-      await resolveAi({ data: { id: ticket.id } });
+      const r = await resolveAi({ data: { id: ticket.id } });
+      if (r?.emailSent) {
+        toast.success("Ticket resolved", { description: "Email notification sent successfully." });
+      } else {
+        toast.success("Ticket resolved", { description: "Ticket updated, but email could not be sent." });
+      }
       onResolved();
     } finally {
       setResolving(false);

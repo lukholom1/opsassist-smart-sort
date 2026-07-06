@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { sendTicketEmailSafe } from "./email.server";
 // (manual approval workflow — no auto bootstrap on submit)
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
@@ -133,7 +134,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         categories,
         priority,
       })
-      .select("id")
+      .select("id, created_at, status")
       .single();
     if (error) throw new Error(error.message);
 
@@ -151,8 +152,56 @@ export const submitTicket = createServerFn({ method: "POST" })
     // Conditional Approval Workflow is now manual — admins request approvals
     // from the ticket details dialog. No auto-bootstrap on submit.
 
+    // ---- Email notifications (fire-and-forget) ----
+    const ticketMeta = {
+      id: row.id,
+      title: data.title,
+      category: categories[0],
+      categories,
+      priority,
+      status: row.status ?? "Open",
+      created_at: row.created_at,
+    };
 
-    return { id: row.id, categories, priority };
+    // 1) Confirmation email to the requester.
+    const requesterEmail = context.profile?.email as string | undefined;
+    let emailSent = false;
+    if (requesterEmail) {
+      const r = await sendTicketEmailSafe({
+        event: "created",
+        to: requesterEmail,
+        recipientName: userName,
+        ticket: ticketMeta,
+      });
+      emailSent = r.sent;
+    }
+
+    // 2) Assignment emails to each assigned staff member.
+    const assigneeIds = Array.from(
+      new Set(rows.map((r) => r.assigned_to).filter((v): v is string => !!v)),
+    );
+    if (assigneeIds.length) {
+      const { data: assignees } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", assigneeIds);
+      const byId = new Map((assignees ?? []).map((p) => [p.id, p]));
+      for (const r of rows) {
+        if (!r.assigned_to) continue;
+        const a = byId.get(r.assigned_to);
+        if (!a?.email) continue;
+        void sendTicketEmailSafe({
+          event: "assigned",
+          to: a.email,
+          recipientName: a.full_name ?? "Team member",
+          ticket: ticketMeta,
+          department: r.department,
+          assigneeName: a.full_name ?? null,
+        });
+      }
+    }
+
+    return { id: row.id, categories, priority, emailSent };
   });
 
 // ----------------------------- Listings -----------------------------
@@ -317,12 +366,55 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
     }
     const patch: { status: typeof data.status; resolved_at?: string } = { status: data.status };
     if (data.status === "Resolved") patch.resolved_at = new Date().toISOString();
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from("ticket_assignments")
       .update(patch)
-      .eq("id", data.assignment_id);
+      .eq("id", data.assignment_id)
+      .select("ticket_id, department")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    // Email the requester about the status change (fire-and-forget).
+    let emailSent = false;
+    if (updated?.ticket_id) {
+      const { data: ticket } = await supabaseAdmin
+        .from("tickets")
+        .select("id, title, category, categories, priority, status, created_at, user_id, user_name")
+        .eq("id", updated.ticket_id)
+        .maybeSingle();
+      if (ticket?.user_id) {
+        const { data: requester } = await supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", ticket.user_id)
+          .maybeSingle();
+        if (requester?.email) {
+          const ticketMeta = {
+            id: ticket.id,
+            title: ticket.title,
+            category: ticket.category,
+            categories: ticket.categories,
+            priority: ticket.priority,
+            status: ticket.status,
+            created_at: ticket.created_at,
+          };
+          // If the parent ticket is now Resolved (trigger closes it when all
+          // assignments resolve), send the "completed" email; otherwise a
+          // generic status_updated email scoped to the affected department.
+          const isCompleted = ticket.status === "Resolved";
+          const r = await sendTicketEmailSafe({
+            event: isCompleted ? "completed" : "status_updated",
+            to: requester.email,
+            recipientName: requester.full_name ?? ticket.user_name ?? "there",
+            ticket: ticketMeta,
+            department: updated.department,
+            newStatus: isCompleted ? "Completed" : `${updated.department}: ${data.status}`,
+          });
+          emailSent = r.sent;
+        }
+      }
+    }
+    return { ok: true, emailSent };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
@@ -413,6 +505,28 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       body,
     });
 
+    // Email the new assignee about the reassignment (fire-and-forget).
+    if (newAssignee) {
+      const [{ data: assignee }, { data: full }] = await Promise.all([
+        supabaseAdmin.from("profiles").select("email, full_name").eq("id", newAssignee).maybeSingle(),
+        supabaseAdmin
+          .from("tickets")
+          .select("id, title, category, categories, priority, status, created_at")
+          .eq("id", current.ticket_id)
+          .maybeSingle(),
+      ]);
+      if (assignee?.email && full) {
+        void sendTicketEmailSafe({
+          event: "assigned",
+          to: assignee.email,
+          recipientName: assignee.full_name ?? "Team member",
+          ticket: full,
+          department: data.new_department,
+          assigneeName: assignee.full_name ?? null,
+        });
+      }
+    }
+
     return { ok: true };
   });
 
@@ -449,7 +563,31 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
         resolution_source: "ai",
       })
       .eq("id", data.id);
-    return { ok: true };
+
+    // Email the requester that their ticket has been completed (fire-and-forget).
+    let emailSent = false;
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("id, title, category, categories, priority, status, created_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    const { data: requesterProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const requesterEmail = requesterProfile?.email as string | undefined;
+    const requesterName = requesterProfile?.full_name ?? "there";
+    if (requesterEmail && ticket) {
+      const r = await sendTicketEmailSafe({
+        event: "completed",
+        to: requesterEmail,
+        recipientName: requesterName,
+        ticket,
+      });
+      emailSent = r.sent;
+    }
+    return { ok: true, emailSent };
   });
 
 // ----------------------------- Feedback -----------------------------
