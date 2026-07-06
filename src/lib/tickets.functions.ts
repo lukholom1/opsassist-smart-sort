@@ -3,7 +3,25 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
-import { sendTicketEmailSafe } from "./email.server";
+// Ticket-lifecycle emails are dispatched from the browser via EmailJS.
+// Server functions return an `emails` payload for the client to send.
+type EmailPayload = {
+  event: "created" | "assigned" | "status_updated" | "completed";
+  to: string;
+  recipientName: string;
+  ticket: {
+    id: string;
+    title: string;
+    category?: string | null;
+    categories?: string[] | null;
+    priority?: string | null;
+    status?: string | null;
+    created_at?: string | null;
+  };
+  department?: string | null;
+  assigneeName?: string | null;
+  newStatus?: string | null;
+};
 // (manual approval workflow — no auto bootstrap on submit)
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
