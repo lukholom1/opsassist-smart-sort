@@ -392,8 +392,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    // Email the requester about the status change (fire-and-forget).
-    let emailSent = false;
+    // Email the requester about the status change — client dispatches via EmailJS.
+    const emails: EmailPayload[] = [];
     if (updated?.ticket_id) {
       const { data: ticket } = await supabaseAdmin
         .from("tickets")
@@ -416,11 +416,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
             status: ticket.status,
             created_at: ticket.created_at,
           };
-          // If the parent ticket is now Resolved (trigger closes it when all
-          // assignments resolve), send the "completed" email; otherwise a
-          // generic status_updated email scoped to the affected department.
           const isCompleted = ticket.status === "Resolved";
-          const r = await sendTicketEmailSafe({
+          emails.push({
             event: isCompleted ? "completed" : "status_updated",
             to: requester.email,
             recipientName: requester.full_name ?? ticket.user_name ?? "there",
@@ -428,11 +425,10 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
             department: updated.department,
             newStatus: isCompleted ? "Completed" : `${updated.department}: ${data.status}`,
           });
-          emailSent = r.sent;
         }
       }
     }
-    return { ok: true, emailSent };
+    return { ok: true, emails };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
