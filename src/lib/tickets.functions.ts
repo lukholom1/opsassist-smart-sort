@@ -170,7 +170,7 @@ export const submitTicket = createServerFn({ method: "POST" })
     // Conditional Approval Workflow is now manual — admins request approvals
     // from the ticket details dialog. No auto-bootstrap on submit.
 
-    // ---- Email notifications (fire-and-forget) ----
+    // ---- Email payloads (sent by client via EmailJS) ----
     const ticketMeta = {
       id: row.id,
       title: data.title,
@@ -181,17 +181,17 @@ export const submitTicket = createServerFn({ method: "POST" })
       created_at: row.created_at,
     };
 
+    const emails: EmailPayload[] = [];
+
     // 1) Confirmation email to the requester.
     const requesterEmail = context.profile?.email as string | undefined;
-    let emailSent = false;
     if (requesterEmail) {
-      const r = await sendTicketEmailSafe({
+      emails.push({
         event: "created",
         to: requesterEmail,
         recipientName: userName,
         ticket: ticketMeta,
       });
-      emailSent = r.sent;
     }
 
     // 2) Assignment emails to each assigned staff member.
@@ -208,7 +208,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         if (!r.assigned_to) continue;
         const a = byId.get(r.assigned_to);
         if (!a?.email) continue;
-        void sendTicketEmailSafe({
+        emails.push({
           event: "assigned",
           to: a.email,
           recipientName: a.full_name ?? "Team member",
@@ -219,7 +219,7 @@ export const submitTicket = createServerFn({ method: "POST" })
       }
     }
 
-    return { id: row.id, categories, priority, emailSent };
+    return { id: row.id, categories, priority, emails };
   });
 
 // ----------------------------- Listings -----------------------------
