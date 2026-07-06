@@ -3,26 +3,19 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
-// Ticket-lifecycle emails are dispatched from the browser via EmailJS.
-// Server functions return an `emails` payload for the client to send.
-type EmailPayload = {
-  event: "created" | "assigned" | "status_updated" | "completed";
-  to: string;
-  recipientName: string;
-  ticket: {
-    id: string;
-    title: string;
-    category?: string | null;
-    categories?: string[] | null;
-    priority?: string | null;
-    status?: string | null;
-    created_at?: string | null;
-  };
-  department?: string | null;
-  assigneeName?: string | null;
-  newStatus?: string | null;
-};
+import { sendTicketEmailSafe, type TicketEmailInput } from "./email.server";
+
+// Ticket-lifecycle emails are dispatched server-side via Resend (see email.server.ts).
+// The `emails` field remains on responses for backward compatibility with the
+// client dispatcher, but is always empty — the server has already sent.
+type EmailPayload = TicketEmailInput;
+
+async function dispatchEmails(payloads: EmailPayload[]): Promise<void> {
+  if (!payloads.length) return;
+  await Promise.all(payloads.map((p) => sendTicketEmailSafe(p)));
+}
 // (manual approval workflow — no auto bootstrap on submit)
+
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
 const PRIORITIES = ["High", "Medium", "Low"] as const;
@@ -219,7 +212,8 @@ export const submitTicket = createServerFn({ method: "POST" })
       }
     }
 
-    return { id: row.id, categories, priority, emails };
+    await dispatchEmails(emails);
+    return { id: row.id, categories, priority, emails: [] as EmailPayload[] };
   });
 
 // ----------------------------- Listings -----------------------------
@@ -428,7 +422,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
         }
       }
     }
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
@@ -542,7 +537,8 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // User marks their ticket resolved by AI.
@@ -601,7 +597,8 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
         ticket,
       });
     }
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // ----------------------------- Feedback -----------------------------
