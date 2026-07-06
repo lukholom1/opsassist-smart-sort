@@ -212,7 +212,8 @@ export const submitTicket = createServerFn({ method: "POST" })
       }
     }
 
-    return { id: row.id, categories, priority, emails };
+    await dispatchEmails(emails);
+    return { id: row.id, categories, priority, emails: [] as EmailPayload[] };
   });
 
 // ----------------------------- Listings -----------------------------
