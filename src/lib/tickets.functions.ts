@@ -537,7 +537,8 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // User marks their ticket resolved by AI.
@@ -596,7 +597,8 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
         ticket,
       });
     }
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // ----------------------------- Feedback -----------------------------
