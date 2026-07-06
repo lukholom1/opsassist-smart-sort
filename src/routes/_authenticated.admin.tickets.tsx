@@ -123,10 +123,15 @@ function AdminTicketsPage() {
     setSaving(assignmentId);
     try {
       const r = await updateStatus({ data: { assignment_id: assignmentId, status: next } });
-      if (r?.emailSent) {
+      const em = await dispatchTicketEmails(r?.emails);
+      if (em.failed === 0 && em.sent > 0) {
         toast.success("Status updated", { description: "Email notification sent successfully." });
+      } else if (em.failed > 0) {
+        toast.warning("Status updated", {
+          description: `Email could not be sent: ${em.errors[0] ?? "unknown error"}`,
+        });
       } else {
-        toast.success("Status updated", { description: "Ticket updated, but email could not be sent." });
+        toast.success("Status updated");
       }
       await refresh();
     } catch (e) {
