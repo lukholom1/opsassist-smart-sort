@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
+import { dispatchTicketEmails } from "@/lib/emailService";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
