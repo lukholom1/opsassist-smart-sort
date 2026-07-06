@@ -519,7 +519,8 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       body,
     });
 
-    // Email the new assignee about the reassignment (fire-and-forget).
+    // Email the new assignee about the reassignment — dispatched by client.
+    const emails: EmailPayload[] = [];
     if (newAssignee) {
       const [{ data: assignee }, { data: full }] = await Promise.all([
         supabaseAdmin.from("profiles").select("email, full_name").eq("id", newAssignee).maybeSingle(),
@@ -530,7 +531,7 @@ export const reassignAssignment = createServerFn({ method: "POST" })
           .maybeSingle(),
       ]);
       if (assignee?.email && full) {
-        void sendTicketEmailSafe({
+        emails.push({
           event: "assigned",
           to: assignee.email,
           recipientName: assignee.full_name ?? "Team member",
@@ -541,7 +542,7 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true };
+    return { ok: true, emails };
   });
 
 // User marks their ticket resolved by AI.
