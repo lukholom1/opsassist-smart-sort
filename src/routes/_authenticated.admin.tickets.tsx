@@ -121,7 +121,12 @@ function AdminTicketsPage() {
   async function changeStatus(assignmentId: string, next: Status) {
     setSaving(assignmentId);
     try {
-      await updateStatus({ data: { assignment_id: assignmentId, status: next } });
+      const r = await updateStatus({ data: { assignment_id: assignmentId, status: next } });
+      if (r?.emailSent) {
+        toast.success("Status updated", { description: "Email notification sent successfully." });
+      } else {
+        toast.success("Status updated", { description: "Ticket updated, but email could not be sent." });
+      }
       await refresh();
     } catch (e) {
       console.error("[updateAssignmentStatus] failed", e);
