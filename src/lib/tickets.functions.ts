@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { sendTicketEmailSafe } from "./email.server";
 // (manual approval workflow — no auto bootstrap on submit)
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
