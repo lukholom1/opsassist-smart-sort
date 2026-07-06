@@ -563,7 +563,26 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
         resolution_source: "ai",
       })
       .eq("id", data.id);
-    return { ok: true };
+
+    // Email the requester that their ticket has been completed (fire-and-forget).
+    let emailSent = false;
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("id, title, category, categories, priority, status, created_at")
+      .eq("id", data.id)
+      .maybeSingle();
+    const requesterEmail = context.profile?.email as string | undefined;
+    const requesterName = context.profile?.full_name ?? "there";
+    if (requesterEmail && ticket) {
+      const r = await sendTicketEmailSafe({
+        event: "completed",
+        to: requesterEmail,
+        recipientName: requesterName,
+        ticket,
+      });
+      emailSent = r.sent;
+    }
+    return { ok: true, emailSent };
   });
 
 // ----------------------------- Feedback -----------------------------
