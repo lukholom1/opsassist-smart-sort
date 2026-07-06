@@ -419,10 +419,15 @@ function AiSupportDialog({
     setResolving(true);
     try {
       const r = await resolveAi({ data: { id: ticket.id } });
-      if (r?.emailSent) {
+      const em = await dispatchTicketEmails(r?.emails);
+      if (em.failed === 0 && em.sent > 0) {
         toast.success("Ticket resolved", { description: "Email notification sent successfully." });
+      } else if (em.failed > 0) {
+        toast.warning("Ticket resolved", {
+          description: `Email could not be sent: ${em.errors[0] ?? "unknown error"}`,
+        });
       } else {
-        toast.success("Ticket resolved", { description: "Ticket updated, but email could not be sent." });
+        toast.success("Ticket resolved");
       }
       onResolved();
     } finally {
