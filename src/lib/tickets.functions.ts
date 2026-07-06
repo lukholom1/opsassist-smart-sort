@@ -3,7 +3,25 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
-import { sendTicketEmailSafe } from "./email.server";
+// Ticket-lifecycle emails are dispatched from the browser via EmailJS.
+// Server functions return an `emails` payload for the client to send.
+type EmailPayload = {
+  event: "created" | "assigned" | "status_updated" | "completed";
+  to: string;
+  recipientName: string;
+  ticket: {
+    id: string;
+    title: string;
+    category?: string | null;
+    categories?: string[] | null;
+    priority?: string | null;
+    status?: string | null;
+    created_at?: string | null;
+  };
+  department?: string | null;
+  assigneeName?: string | null;
+  newStatus?: string | null;
+};
 // (manual approval workflow — no auto bootstrap on submit)
 
 const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
@@ -152,7 +170,7 @@ export const submitTicket = createServerFn({ method: "POST" })
     // Conditional Approval Workflow is now manual — admins request approvals
     // from the ticket details dialog. No auto-bootstrap on submit.
 
-    // ---- Email notifications (fire-and-forget) ----
+    // ---- Email payloads (sent by client via EmailJS) ----
     const ticketMeta = {
       id: row.id,
       title: data.title,
@@ -163,17 +181,17 @@ export const submitTicket = createServerFn({ method: "POST" })
       created_at: row.created_at,
     };
 
+    const emails: EmailPayload[] = [];
+
     // 1) Confirmation email to the requester.
     const requesterEmail = context.profile?.email as string | undefined;
-    let emailSent = false;
     if (requesterEmail) {
-      const r = await sendTicketEmailSafe({
+      emails.push({
         event: "created",
         to: requesterEmail,
         recipientName: userName,
         ticket: ticketMeta,
       });
-      emailSent = r.sent;
     }
 
     // 2) Assignment emails to each assigned staff member.
@@ -190,7 +208,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         if (!r.assigned_to) continue;
         const a = byId.get(r.assigned_to);
         if (!a?.email) continue;
-        void sendTicketEmailSafe({
+        emails.push({
           event: "assigned",
           to: a.email,
           recipientName: a.full_name ?? "Team member",
@@ -201,7 +219,7 @@ export const submitTicket = createServerFn({ method: "POST" })
       }
     }
 
-    return { id: row.id, categories, priority, emailSent };
+    return { id: row.id, categories, priority, emails };
   });
 
 // ----------------------------- Listings -----------------------------
@@ -374,8 +392,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    // Email the requester about the status change (fire-and-forget).
-    let emailSent = false;
+    // Email the requester about the status change — client dispatches via EmailJS.
+    const emails: EmailPayload[] = [];
     if (updated?.ticket_id) {
       const { data: ticket } = await supabaseAdmin
         .from("tickets")
@@ -398,11 +416,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
             status: ticket.status,
             created_at: ticket.created_at,
           };
-          // If the parent ticket is now Resolved (trigger closes it when all
-          // assignments resolve), send the "completed" email; otherwise a
-          // generic status_updated email scoped to the affected department.
           const isCompleted = ticket.status === "Resolved";
-          const r = await sendTicketEmailSafe({
+          emails.push({
             event: isCompleted ? "completed" : "status_updated",
             to: requester.email,
             recipientName: requester.full_name ?? ticket.user_name ?? "there",
@@ -410,11 +425,10 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
             department: updated.department,
             newStatus: isCompleted ? "Completed" : `${updated.department}: ${data.status}`,
           });
-          emailSent = r.sent;
         }
       }
     }
-    return { ok: true, emailSent };
+    return { ok: true, emails };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
@@ -505,7 +519,8 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       body,
     });
 
-    // Email the new assignee about the reassignment (fire-and-forget).
+    // Email the new assignee about the reassignment — dispatched by client.
+    const emails: EmailPayload[] = [];
     if (newAssignee) {
       const [{ data: assignee }, { data: full }] = await Promise.all([
         supabaseAdmin.from("profiles").select("email, full_name").eq("id", newAssignee).maybeSingle(),
@@ -516,7 +531,7 @@ export const reassignAssignment = createServerFn({ method: "POST" })
           .maybeSingle(),
       ]);
       if (assignee?.email && full) {
-        void sendTicketEmailSafe({
+        emails.push({
           event: "assigned",
           to: assignee.email,
           recipientName: assignee.full_name ?? "Team member",
@@ -527,7 +542,7 @@ export const reassignAssignment = createServerFn({ method: "POST" })
       }
     }
 
-    return { ok: true };
+    return { ok: true, emails };
   });
 
 // User marks their ticket resolved by AI.
@@ -564,8 +579,8 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
 
-    // Email the requester that their ticket has been completed (fire-and-forget).
-    let emailSent = false;
+    // Email the requester that their ticket has been completed — dispatched by client.
+    const emails: EmailPayload[] = [];
     const { data: ticket } = await supabaseAdmin
       .from("tickets")
       .select("id, title, category, categories, priority, status, created_at")
@@ -579,15 +594,14 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
     const requesterEmail = requesterProfile?.email as string | undefined;
     const requesterName = requesterProfile?.full_name ?? "there";
     if (requesterEmail && ticket) {
-      const r = await sendTicketEmailSafe({
+      emails.push({
         event: "completed",
         to: requesterEmail,
         recipientName: requesterName,
         ticket,
       });
-      emailSent = r.sent;
     }
-    return { ok: true, emailSent };
+    return { ok: true, emails };
   });
 
 // ----------------------------- Feedback -----------------------------

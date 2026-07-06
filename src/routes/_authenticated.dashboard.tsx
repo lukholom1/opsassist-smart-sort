@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { toast } from "sonner";
+import { dispatchTicketEmails } from "@/lib/emailService";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -303,10 +304,15 @@ function NewTicketDialog({
     setError(null);
     try {
       const r = await submit({ data: { title, details } });
-      if (r?.emailSent) {
+      const em = await dispatchTicketEmails(r?.emails);
+      if (em.failed === 0 && em.sent > 0) {
         toast.success("Ticket submitted", { description: "Email notification sent successfully." });
+      } else if (em.failed > 0) {
+        toast.warning("Ticket submitted", {
+          description: `Email could not be sent: ${em.errors[0] ?? "unknown error"}`,
+        });
       } else {
-        toast.success("Ticket submitted", { description: "Ticket created, but email could not be sent." });
+        toast.success("Ticket submitted");
       }
       onCreated();
     } catch (err) {
@@ -413,10 +419,15 @@ function AiSupportDialog({
     setResolving(true);
     try {
       const r = await resolveAi({ data: { id: ticket.id } });
-      if (r?.emailSent) {
+      const em = await dispatchTicketEmails(r?.emails);
+      if (em.failed === 0 && em.sent > 0) {
         toast.success("Ticket resolved", { description: "Email notification sent successfully." });
+      } else if (em.failed > 0) {
+        toast.warning("Ticket resolved", {
+          description: `Email could not be sent: ${em.errors[0] ?? "unknown error"}`,
+        });
       } else {
-        toast.success("Ticket resolved", { description: "Ticket updated, but email could not be sent." });
+        toast.success("Ticket resolved");
       }
       onResolved();
     } finally {
