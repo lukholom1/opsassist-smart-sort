@@ -412,7 +412,12 @@ function AiSupportDialog({
   async function handleResolved() {
     setResolving(true);
     try {
-      await resolveAi({ data: { id: ticket.id } });
+      const r = await resolveAi({ data: { id: ticket.id } });
+      if (r?.emailSent) {
+        toast.success("Ticket resolved", { description: "Email notification sent successfully." });
+      } else {
+        toast.success("Ticket resolved", { description: "Ticket updated, but email could not be sent." });
+      }
       onResolved();
     } finally {
       setResolving(false);
