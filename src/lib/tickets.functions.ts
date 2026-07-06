@@ -134,7 +134,7 @@ export const submitTicket = createServerFn({ method: "POST" })
         categories,
         priority,
       })
-      .select("id")
+      .select("id, created_at, status")
       .single();
     if (error) throw new Error(error.message);
 
@@ -152,8 +152,56 @@ export const submitTicket = createServerFn({ method: "POST" })
     // Conditional Approval Workflow is now manual — admins request approvals
     // from the ticket details dialog. No auto-bootstrap on submit.
 
+    // ---- Email notifications (fire-and-forget) ----
+    const ticketMeta = {
+      id: row.id,
+      title: data.title,
+      category: categories[0],
+      categories,
+      priority,
+      status: row.status ?? "Open",
+      created_at: row.created_at,
+    };
 
-    return { id: row.id, categories, priority };
+    // 1) Confirmation email to the requester.
+    const requesterEmail = context.profile?.email as string | undefined;
+    let emailSent = false;
+    if (requesterEmail) {
+      const r = await sendTicketEmailSafe({
+        event: "created",
+        to: requesterEmail,
+        recipientName: userName,
+        ticket: ticketMeta,
+      });
+      emailSent = r.sent;
+    }
+
+    // 2) Assignment emails to each assigned staff member.
+    const assigneeIds = Array.from(
+      new Set(rows.map((r) => r.assigned_to).filter((v): v is string => !!v)),
+    );
+    if (assigneeIds.length) {
+      const { data: assignees } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name")
+        .in("id", assigneeIds);
+      const byId = new Map((assignees ?? []).map((p) => [p.id, p]));
+      for (const r of rows) {
+        if (!r.assigned_to) continue;
+        const a = byId.get(r.assigned_to);
+        if (!a?.email) continue;
+        void sendTicketEmailSafe({
+          event: "assigned",
+          to: a.email,
+          recipientName: a.full_name ?? "Team member",
+          ticket: ticketMeta,
+          department: r.department,
+          assigneeName: a.full_name ?? null,
+        });
+      }
+    }
+
+    return { id: row.id, categories, priority, emailSent };
   });
 
 // ----------------------------- Listings -----------------------------
