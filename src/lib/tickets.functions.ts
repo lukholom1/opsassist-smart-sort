@@ -366,12 +366,55 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
     }
     const patch: { status: typeof data.status; resolved_at?: string } = { status: data.status };
     if (data.status === "Resolved") patch.resolved_at = new Date().toISOString();
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from("ticket_assignments")
       .update(patch)
-      .eq("id", data.assignment_id);
+      .eq("id", data.assignment_id)
+      .select("ticket_id, department")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    // Email the requester about the status change (fire-and-forget).
+    let emailSent = false;
+    if (updated?.ticket_id) {
+      const { data: ticket } = await supabaseAdmin
+        .from("tickets")
+        .select("id, title, category, categories, priority, status, created_at, user_id, user_name")
+        .eq("id", updated.ticket_id)
+        .maybeSingle();
+      if (ticket?.user_id) {
+        const { data: requester } = await supabaseAdmin
+          .from("profiles")
+          .select("email, full_name")
+          .eq("id", ticket.user_id)
+          .maybeSingle();
+        if (requester?.email) {
+          const ticketMeta = {
+            id: ticket.id,
+            title: ticket.title,
+            category: ticket.category,
+            categories: ticket.categories,
+            priority: ticket.priority,
+            status: ticket.status,
+            created_at: ticket.created_at,
+          };
+          // If the parent ticket is now Resolved (trigger closes it when all
+          // assignments resolve), send the "completed" email; otherwise a
+          // generic status_updated email scoped to the affected department.
+          const isCompleted = ticket.status === "Resolved";
+          const r = await sendTicketEmailSafe({
+            event: isCompleted ? "completed" : "status_updated",
+            to: requester.email,
+            recipientName: requester.full_name ?? ticket.user_name ?? "there",
+            ticket: ticketMeta,
+            department: updated.department,
+            newStatus: isCompleted ? "Completed" : `${updated.department}: ${data.status}`,
+          });
+          emailSent = r.sent;
+        }
+      }
+    }
+    return { ok: true, emailSent };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
