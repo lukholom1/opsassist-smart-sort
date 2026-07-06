@@ -2,8 +2,8 @@
 // NEVER import from client code (filename .server.ts is bundler-protected).
 
 const RESEND_URL = "https://api.resend.com/emails";
-// Resend's onboarding sender works without a verified domain — fine for OTP demos.
-const FROM = "OpsAssist <onboarding@resend.dev>";
+// Verified domain on Resend — allows sending to any recipient.
+const FROM = "OpsAssist <no-reply@lukholo.online>";
 
 export async function sendOtpEmail(opts: {
   to: string;
