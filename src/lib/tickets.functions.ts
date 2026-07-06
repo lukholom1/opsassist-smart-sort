@@ -579,8 +579,8 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
 
-    // Email the requester that their ticket has been completed (fire-and-forget).
-    let emailSent = false;
+    // Email the requester that their ticket has been completed — dispatched by client.
+    const emails: EmailPayload[] = [];
     const { data: ticket } = await supabaseAdmin
       .from("tickets")
       .select("id, title, category, categories, priority, status, created_at")
@@ -594,15 +594,14 @@ export const markResolvedByAI = createServerFn({ method: "POST" })
     const requesterEmail = requesterProfile?.email as string | undefined;
     const requesterName = requesterProfile?.full_name ?? "there";
     if (requesterEmail && ticket) {
-      const r = await sendTicketEmailSafe({
+      emails.push({
         event: "completed",
         to: requesterEmail,
         recipientName: requesterName,
         ticket,
       });
-      emailSent = r.sent;
     }
-    return { ok: true, emailSent };
+    return { ok: true, emails };
   });
 
 // ----------------------------- Feedback -----------------------------
