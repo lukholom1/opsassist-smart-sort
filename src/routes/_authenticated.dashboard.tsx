@@ -304,10 +304,15 @@ function NewTicketDialog({
     setError(null);
     try {
       const r = await submit({ data: { title, details } });
-      if (r?.emailSent) {
+      const em = await dispatchTicketEmails(r?.emails);
+      if (em.failed === 0 && em.sent > 0) {
         toast.success("Ticket submitted", { description: "Email notification sent successfully." });
+      } else if (em.failed > 0) {
+        toast.warning("Ticket submitted", {
+          description: `Email could not be sent: ${em.errors[0] ?? "unknown error"}`,
+        });
       } else {
-        toast.success("Ticket submitted", { description: "Ticket created, but email could not be sent." });
+        toast.success("Ticket submitted");
       }
       onCreated();
     } catch (err) {
