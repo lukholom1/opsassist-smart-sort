@@ -422,7 +422,8 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
         }
       }
     }
-    return { ok: true, emails };
+    await dispatchEmails(emails);
+    return { ok: true, emails: [] as EmailPayload[] };
   });
 
 // Reassign an assignment to a different department (with mandatory note).
