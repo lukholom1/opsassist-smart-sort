@@ -302,7 +302,12 @@ function NewTicketDialog({
     setLoading(true);
     setError(null);
     try {
-      await submit({ data: { title, details } });
+      const r = await submit({ data: { title, details } });
+      if (r?.emailSent) {
+        toast.success("Ticket submitted", { description: "Email notification sent successfully." });
+      } else {
+        toast.success("Ticket submitted", { description: "Ticket created, but email could not be sent." });
+      }
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit");
