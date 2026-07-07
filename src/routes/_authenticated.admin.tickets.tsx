@@ -497,7 +497,11 @@ function TicketTable({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Open">Open</SelectItem>
-                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            {a.status === "In Progress" && (
+                              <SelectItem value="In Progress" disabled>
+                                In Progress (auto)
+                              </SelectItem>
+                            )}
                             <SelectItem value="Resolved">Resolved</SelectItem>
                           </SelectContent>
                         </Select>
