@@ -963,6 +963,38 @@ async function assertNoteAccess(
   };
 }
 
+// Auto-transition ticket from Open → In Progress when a new conversation
+// message is posted. No-op for other statuses (Resolved stays Resolved).
+async function bumpTicketToInProgress(
+  ticketId: string,
+  currentStatus: string,
+  actor: { id: string; name: string; role: "user" | "admin" | "ai" },
+): Promise<void> {
+  if (currentStatus !== "Open") return;
+  const { data: updated, error } = await supabaseAdmin
+    .from("tickets")
+    .update({ status: "In Progress", workflow_stage: "in_progress" })
+    .eq("id", ticketId)
+    .eq("status", "Open")
+    .select("id")
+    .maybeSingle();
+  if (error || !updated) return;
+  await supabaseAdmin.from("ticket_activity").insert({
+    ticket_id: ticketId,
+    actor_id: actor.id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    event_type: "auto_status_changed",
+    description: "Status: Open → In Progress (new conversation message)",
+    metadata: {
+      from: "Open",
+      to: "In Progress",
+      trigger: "new_conversation_message",
+      actor_role: actor.role,
+    },
+  });
+}
+
 export const listTicketNotes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ ticket_id: z.string().uuid() }).parse(input))
