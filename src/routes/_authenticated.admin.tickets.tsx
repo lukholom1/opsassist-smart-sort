@@ -123,6 +123,29 @@ function AdminTicketsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Deep-link from notifications: open the referenced ticket once loaded.
+  const search = Route.useSearch();
+  const handledTicketRef = useRef<string | null>(null);
+  useEffect(() => {
+    const target = search.ticket;
+    if (!target || loading) return;
+    if (handledTicketRef.current === target) return;
+    const found = tickets.find((t) => t.id === target);
+    if (found) {
+      handledTicketRef.current = target;
+      if (search.focus === "notes") setNotesTicket(found);
+      else setDetailsTicket(found);
+      navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
+    } else if (tickets.length > 0) {
+      handledTicketRef.current = target;
+      toast.error("That ticket is no longer available", {
+        description: "It may have been removed or isn't in your department.",
+      });
+      navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
+    }
+  }, [search.ticket, search.focus, tickets, loading, navigate]);
+
+
   async function changeStatus(assignmentId: string, next: Status) {
     setSaving(assignmentId);
     try {
