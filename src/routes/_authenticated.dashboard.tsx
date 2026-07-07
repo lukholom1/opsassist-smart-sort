@@ -67,6 +67,7 @@ type Ticket = {
 function DashboardPage() {
   const navigate = useNavigate();
   const { signOut, fullName, role } = useAuth();
+  const search = Route.useSearch();
   useEffect(() => {
     if (role === "admin") navigate({ to: "/admin", replace: true });
   }, [role, navigate]);
