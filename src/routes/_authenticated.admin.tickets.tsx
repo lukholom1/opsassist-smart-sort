@@ -90,6 +90,7 @@ function AdminTicketsPage() {
   const fetchTickets = useServerFn(listDeptTickets);
   const updateStatus = useServerFn(updateAssignmentStatus);
   const reassign = useServerFn(reassignAssignment);
+  const touchInProgress = useServerFn(touchTicketInProgress);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
