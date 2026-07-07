@@ -135,8 +135,8 @@ function AdminTicketsPage() {
     const found = tickets.find((t) => t.id === target);
     if (found) {
       handledTicketRef.current = target;
-      if (search.focus === "notes") setNotesTicket(found);
-      else setDetailsTicket(found);
+      if (search.focus === "notes") touchAndOpen(found, setNotesTicket);
+      else touchAndOpen(found, setDetailsTicket);
       navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
     } else if (tickets.length > 0) {
       handledTicketRef.current = target;
