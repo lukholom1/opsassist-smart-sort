@@ -62,6 +62,30 @@ function ApprovalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Deep-link from notifications: scroll to the referenced approval card.
+  const search = Route.useSearch();
+  const highlightId = search.highlight;
+  const handledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    if (handledRef.current === highlightId) return;
+    const match = items.find((a) => a.ticket_id === highlightId);
+    if (match) {
+      handledRef.current = highlightId;
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`approval-${match.id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    } else if (items.length > 0 || !loading) {
+      handledRef.current = highlightId;
+      toast.info("That approval is no longer pending", {
+        description: "It may have already been decided.",
+      });
+      navigate({ to: "/admin/approvals", search: {}, replace: true }).catch(() => {});
+    }
+  }, [highlightId, items, loading, navigate]);
+
   async function decide(id: string, decision: "approve" | "reject" | "info") {
     const comment = (comments[id] ?? "").trim();
     if (decision === "reject" && !comment) {
