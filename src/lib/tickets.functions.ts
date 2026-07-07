@@ -1034,6 +1034,11 @@ export const addTicketNote = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    await bumpTicketToInProgress(data.ticket_id, ticket.status, {
+      id: context.userId,
+      name,
+      role,
+    });
     return { note: row as TicketNote };
   });
 
