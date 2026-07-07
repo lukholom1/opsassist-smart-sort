@@ -5,6 +5,7 @@ import {
   listDeptTickets,
   updateAssignmentStatus,
   reassignAssignment,
+  touchTicketInProgress,
   type AssignmentRow,
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
@@ -89,6 +90,7 @@ function AdminTicketsPage() {
   const fetchTickets = useServerFn(listDeptTickets);
   const updateStatus = useServerFn(updateAssignmentStatus);
   const reassign = useServerFn(reassignAssignment);
+  const touchInProgress = useServerFn(touchTicketInProgress);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -133,8 +135,8 @@ function AdminTicketsPage() {
     const found = tickets.find((t) => t.id === target);
     if (found) {
       handledTicketRef.current = target;
-      if (search.focus === "notes") setNotesTicket(found);
-      else setDetailsTicket(found);
+      if (search.focus === "notes") touchAndOpen(found, setNotesTicket);
+      else touchAndOpen(found, setDetailsTicket);
       navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
     } else if (tickets.length > 0) {
       handledTicketRef.current = target;
@@ -170,6 +172,24 @@ function AdminTicketsPage() {
       );
     } finally {
       setSaving(null);
+    }
+  }
+
+  // Any admin interaction with a still-Open ticket auto-promotes it to
+  // "In Progress" on the server (idempotent — safe to call always).
+  async function touchAndOpen(t: Ticket, opener: (t: Ticket) => void) {
+    opener(t);
+    const isOpen =
+      t.status === "Open" ||
+      t.assignments.some((a) => a.status === "Open") ||
+      t.my_assignment?.status === "Open";
+    if (!isOpen) return;
+    try {
+      await touchInProgress({ data: { ticket_id: t.id } });
+      await refresh();
+    } catch (e) {
+      // Non-blocking: promotion is a side-effect, not part of the open flow.
+      console.warn("[touchTicketInProgress] failed", e);
     }
   }
 
@@ -286,8 +306,8 @@ function AdminTicketsPage() {
                 myDept={department}
                 saving={saving}
                 onStatus={changeStatus}
-                onOpenNotes={setNotesTicket}
-                onOpenDetails={setDetailsTicket}
+                onOpenNotes={(t) => touchAndOpen(t, setNotesTicket)}
+                onOpenDetails={(t) => touchAndOpen(t, setDetailsTicket)}
                 onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
                 unreadCounts={unreadCounts}
               />
@@ -477,7 +497,11 @@ function TicketTable({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Open">Open</SelectItem>
-                            <SelectItem value="In Progress">In Progress</SelectItem>
+                            {a.status === "In Progress" && (
+                              <SelectItem value="In Progress" disabled>
+                                In Progress (auto)
+                              </SelectItem>
+                            )}
                             <SelectItem value="Resolved">Resolved</SelectItem>
                           </SelectContent>
                         </Select>

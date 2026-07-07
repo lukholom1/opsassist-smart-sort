@@ -1002,6 +1002,59 @@ export const addTicketNote = createServerFn({ method: "POST" })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
+    // Admin interaction: auto-promote Open → In Progress.
+    if (role === "admin") {
+      await promoteToInProgress(data.ticket_id, context.userId);
+    }
     return { note: row as TicketNote };
+  });
+
+// ----------------------------- Auto status: Open → In Progress -----------------------------
+
+// Called whenever an admin interacts with a ticket (opens details, adds a
+// note, edits, etc.). Promotes the caller's own department assignment(s)
+// from "Open" → "In Progress" and, when the parent ticket is still "Open",
+// promotes it too. Never touches Resolved records.
+async function promoteToInProgress(ticketId: string, adminUserId: string): Promise<void> {
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("department")
+    .eq("id", adminUserId)
+    .maybeSingle();
+  const dept = (profile?.department ?? null) as Department | null;
+
+  let q = supabaseAdmin
+    .from("ticket_assignments")
+    .update({ status: "In Progress" })
+    .eq("ticket_id", ticketId)
+    .eq("status", "Open");
+  if (dept) q = q.eq("department", dept);
+  await q;
+
+  await supabaseAdmin
+    .from("tickets")
+    .update({ status: "In Progress" })
+    .eq("id", ticketId)
+    .eq("status", "Open");
+}
+
+export const touchTicketInProgress = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) =>
+    z.object({ ticket_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const dept = context.department as Department | null;
+    const { data: t } = await supabaseAdmin
+      .from("tickets")
+      .select("categories")
+      .eq("id", data.ticket_id)
+      .maybeSingle();
+    if (!t) throw new Error("Ticket not found.");
+    if (dept && !(t.categories ?? []).includes(dept)) {
+      throw new Error("Not in your department.");
+    }
+    await promoteToInProgress(data.ticket_id, context.userId);
+    return { ok: true };
   });
 
