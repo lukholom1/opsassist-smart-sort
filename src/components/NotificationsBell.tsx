@@ -175,7 +175,7 @@ export function NotificationsBell() {
                   <li key={n.id}>
                     <button
                       type="button"
-                      onClick={() => markOneRead(n.id)}
+                      onClick={() => handleClick(n)}
                       className={cn(
                         "flex w-full items-start gap-2 border-l-2 px-4 py-3 text-left transition hover:bg-muted/50",
                         accent,
