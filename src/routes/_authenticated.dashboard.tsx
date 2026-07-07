@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   submitTicket,
   listMyTickets,
@@ -41,6 +41,10 @@ import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    ticket: typeof s.ticket === "string" ? s.ticket : undefined,
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: DashboardPage,
 });
 
@@ -63,6 +67,7 @@ type Ticket = {
 function DashboardPage() {
   const navigate = useNavigate();
   const { signOut, fullName, role } = useAuth();
+  const search = Route.useSearch();
   useEffect(() => {
     if (role === "admin") navigate({ to: "/admin", replace: true });
   }, [role, navigate]);
@@ -107,6 +112,26 @@ function DashboardPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Deep-link from notifications: open the referenced ticket once loaded.
+  const handledTicketRef = useRef<string | null>(null);
+  useEffect(() => {
+    const target = search.ticket;
+    if (!target || loading) return;
+    if (handledTicketRef.current === target) return;
+    const found = tickets.find((t) => t.id === target);
+    if (found) {
+      handledTicketRef.current = target;
+      setChatTicket(found);
+      navigate({ to: "/dashboard", search: {}, replace: true }).catch(() => {});
+    } else if (tickets.length > 0) {
+      handledTicketRef.current = target;
+      toast.error("That ticket is no longer available", {
+        description: "It may have been removed or you don't have access.",
+      });
+      navigate({ to: "/dashboard", search: {}, replace: true }).catch(() => {});
+    }
+  }, [search.ticket, tickets, loading, navigate]);
 
   async function handleSignOut() {
     await signOut();

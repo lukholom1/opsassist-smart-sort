@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { getNotificationTarget } from "@/lib/notification-target";
 
 type Notif = {
   id: string;
@@ -13,6 +15,7 @@ type Notif = {
   body: string | null;
   type: string;
   ticket_id: string | null;
+  metadata: Record<string, any> | null;
   read_at: string | null;
   created_at: string;
 };
@@ -25,7 +28,8 @@ const APPROVAL_TYPES = new Set([
 ]);
 
 export function NotificationsBell() {
-  const { session } = useAuth();
+  const { session, role } = useAuth();
+  const navigate = useNavigate();
   const userId = session?.user?.id ?? null;
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +42,7 @@ export function NotificationsBell() {
     (async () => {
       const { data } = await supabase
         .from("notifications")
-        .select("id, title, body, type, ticket_id, read_at, created_at")
+        .select("id, title, body, type, ticket_id, metadata, read_at, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(30);
@@ -103,6 +107,26 @@ export function NotificationsBell() {
     await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
   }
 
+  async function handleClick(n: Notif) {
+    setOpen(false);
+    // Mark as read but don't block navigation on the network round-trip.
+    if (!n.read_at) markOneRead(n.id).catch(() => {});
+    try {
+      const target = getNotificationTarget(n, role);
+      await navigate({
+        to: target.to,
+        search: target.search as never,
+        hash: target.hash,
+      });
+    } catch (e) {
+      console.error("[notifications] navigation failed", e);
+      toast.error("That item is no longer available", {
+        description: "Returning you to your dashboard.",
+      });
+      navigate({ to: role === "admin" ? "/admin" : "/dashboard" }).catch(() => {});
+    }
+  }
+
   if (!userId) return null;
 
   return (
@@ -151,7 +175,7 @@ export function NotificationsBell() {
                   <li key={n.id}>
                     <button
                       type="button"
-                      onClick={() => markOneRead(n.id)}
+                      onClick={() => handleClick(n)}
                       className={cn(
                         "flex w-full items-start gap-2 border-l-2 px-4 py-3 text-left transition hover:bg-muted/50",
                         accent,

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { listPendingApprovals, decideApproval } from "@/lib/workflow.functions";
 import { useAuth } from "@/hooks/use-auth";
@@ -22,6 +22,9 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin/approvals")({
   head: () => ({ meta: [{ title: "Approvals — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    highlight: typeof s.highlight === "string" ? s.highlight : undefined,
+  }),
   component: ApprovalsPage,
 });
 
@@ -58,6 +61,30 @@ function ApprovalsPage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Deep-link from notifications: scroll to the referenced approval card.
+  const search = Route.useSearch();
+  const highlightId = search.highlight;
+  const handledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    if (handledRef.current === highlightId) return;
+    const match = items.find((a) => a.ticket_id === highlightId);
+    if (match) {
+      handledRef.current = highlightId;
+      requestAnimationFrame(() => {
+        document
+          .getElementById(`approval-${match.id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    } else if (items.length > 0 || !loading) {
+      handledRef.current = highlightId;
+      toast.info("That approval is no longer pending", {
+        description: "It may have already been decided.",
+      });
+      navigate({ to: "/admin/approvals", search: {}, replace: true }).catch(() => {});
+    }
+  }, [highlightId, items, loading, navigate]);
 
   async function decide(id: string, decision: "approve" | "reject" | "info") {
     const comment = (comments[id] ?? "").trim();
@@ -127,7 +154,16 @@ function ApprovalsPage() {
             {items.map((a) => {
               const t = a.ticket as any;
               return (
-                <Card key={a.id} className="shadow-sm">
+                <Card
+                  key={a.id}
+                  id={`approval-${a.id}`}
+                  className={`shadow-sm transition ${
+                    highlightId && a.ticket_id === highlightId
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : ""
+                  }`}
+                >
+
                   <CardHeader className="pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>

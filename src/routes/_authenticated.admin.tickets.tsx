@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   listDeptTickets,
   updateAssignmentStatus,
@@ -52,6 +52,10 @@ import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 
 export const Route = createFileRoute("/_authenticated/admin/tickets")({
   head: () => ({ meta: [{ title: "Tickets — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    ticket: typeof s.ticket === "string" ? s.ticket : undefined,
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: AdminTicketsPage,
 });
 
@@ -118,6 +122,29 @@ function AdminTicketsPage() {
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Deep-link from notifications: open the referenced ticket once loaded.
+  const search = Route.useSearch();
+  const handledTicketRef = useRef<string | null>(null);
+  useEffect(() => {
+    const target = search.ticket;
+    if (!target || loading) return;
+    if (handledTicketRef.current === target) return;
+    const found = tickets.find((t) => t.id === target);
+    if (found) {
+      handledTicketRef.current = target;
+      if (search.focus === "notes") setNotesTicket(found);
+      else setDetailsTicket(found);
+      navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
+    } else if (tickets.length > 0) {
+      handledTicketRef.current = target;
+      toast.error("That ticket is no longer available", {
+        description: "It may have been removed or isn't in your department.",
+      });
+      navigate({ to: "/admin/tickets", search: {}, replace: true }).catch(() => {});
+    }
+  }, [search.ticket, search.focus, tickets, loading, navigate]);
+
 
   async function changeStatus(assignmentId: string, next: Status) {
     setSaving(assignmentId);
