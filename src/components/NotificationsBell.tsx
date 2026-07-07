@@ -42,7 +42,7 @@ export function NotificationsBell() {
     (async () => {
       const { data } = await supabase
         .from("notifications")
-        .select("id, title, body, type, ticket_id, read_at, created_at")
+        .select("id, title, body, type, ticket_id, metadata, read_at, created_at")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(30);
