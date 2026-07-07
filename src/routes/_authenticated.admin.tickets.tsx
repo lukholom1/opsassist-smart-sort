@@ -306,8 +306,8 @@ function AdminTicketsPage() {
                 myDept={department}
                 saving={saving}
                 onStatus={changeStatus}
-                onOpenNotes={setNotesTicket}
-                onOpenDetails={setDetailsTicket}
+                onOpenNotes={(t) => touchAndOpen(t, setNotesTicket)}
+                onOpenDetails={(t) => touchAndOpen(t, setDetailsTicket)}
                 onReassign={(t, a) => setReassignTarget({ ticket: t, assignment: a })}
                 unreadCounts={unreadCounts}
               />
