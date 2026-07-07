@@ -801,6 +801,12 @@ export const askTicketBot = createServerFn({ method: "POST" })
       body: data.message,
     });
 
+    await bumpTicketToInProgress(data.ticket_id, ticket.status, {
+      id: context.userId,
+      name: userName,
+      role: "user",
+    });
+
     const [{ data: notes }, { data: assignments }] = await Promise.all([
       supabaseAdmin
         .from("ticket_notes")
