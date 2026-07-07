@@ -1029,13 +1029,60 @@ async function promoteToInProgress(ticketId: string, adminUserId: string): Promi
     .eq("ticket_id", ticketId)
     .eq("status", "Open");
   if (dept) q = q.eq("department", dept);
-  await q;
+  const { data: promotedAssignments } = await q.select("department");
 
-  await supabaseAdmin
+  const { data: promotedTicket } = await supabaseAdmin
     .from("tickets")
     .update({ status: "In Progress" })
     .eq("id", ticketId)
-    .eq("status", "Open");
+    .eq("status", "Open")
+    .select("id, title, category, categories, priority, status, created_at, user_id, user_name")
+    .maybeSingle();
+
+  // Only email on an actual Open → In Progress transition (idempotent — no
+  // duplicate emails when the ticket was already In Progress).
+  const transitioned =
+    !!promotedTicket || (promotedAssignments && promotedAssignments.length > 0);
+  if (!transitioned) return;
+
+  const { data: ticket } =
+    promotedTicket
+      ? { data: promotedTicket }
+      : await supabaseAdmin
+          .from("tickets")
+          .select("id, title, category, categories, priority, status, created_at, user_id, user_name")
+          .eq("id", ticketId)
+          .maybeSingle();
+  if (!ticket?.user_id) return;
+
+  const { data: requester } = await supabaseAdmin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", ticket.user_id)
+    .maybeSingle();
+  if (!requester?.email) return;
+
+  const promotedDept =
+    dept ?? promotedAssignments?.[0]?.department ?? null;
+
+  await dispatchEmails([
+    {
+      event: "status_updated",
+      to: requester.email,
+      recipientName: requester.full_name ?? ticket.user_name ?? "there",
+      ticket: {
+        id: ticket.id,
+        title: ticket.title,
+        category: ticket.category,
+        categories: ticket.categories,
+        priority: ticket.priority,
+        status: "In Progress",
+        created_at: ticket.created_at,
+      },
+      department: promotedDept,
+      newStatus: promotedDept ? `${promotedDept}: In Progress` : "In Progress",
+    },
+  ]);
 }
 
 export const touchTicketInProgress = createServerFn({ method: "POST" })
