@@ -41,6 +41,10 @@ import { useNotesRealtime } from "@/hooks/use-notes-realtime";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    ticket: typeof s.ticket === "string" ? s.ticket : undefined,
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: DashboardPage,
 });
 
