@@ -15,6 +15,7 @@ type Notif = {
   body: string | null;
   type: string;
   ticket_id: string | null;
+  metadata: Record<string, any> | null;
   read_at: string | null;
   created_at: string;
 };
