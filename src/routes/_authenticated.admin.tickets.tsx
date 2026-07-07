@@ -175,6 +175,24 @@ function AdminTicketsPage() {
     }
   }
 
+  // Any admin interaction with a still-Open ticket auto-promotes it to
+  // "In Progress" on the server (idempotent — safe to call always).
+  async function touchAndOpen(t: Ticket, opener: (t: Ticket) => void) {
+    opener(t);
+    const isOpen =
+      t.status === "Open" ||
+      t.assignments.some((a) => a.status === "Open") ||
+      t.my_assignment?.status === "Open";
+    if (!isOpen) return;
+    try {
+      await touchInProgress({ data: { ticket_id: t.id } });
+      await refresh();
+    } catch (e) {
+      // Non-blocking: promotion is a side-effect, not part of the open flow.
+      console.warn("[touchTicketInProgress] failed", e);
+    }
+  }
+
   const filtered = useMemo(
     () =>
       tickets.filter((t) => {
