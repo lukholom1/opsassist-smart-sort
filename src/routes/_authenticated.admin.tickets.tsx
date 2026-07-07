@@ -5,6 +5,7 @@ import {
   listDeptTickets,
   updateAssignmentStatus,
   reassignAssignment,
+  touchTicketInProgress,
   type AssignmentRow,
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
