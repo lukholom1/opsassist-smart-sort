@@ -28,7 +28,8 @@ const APPROVAL_TYPES = new Set([
 ]);
 
 export function NotificationsBell() {
-  const { session } = useAuth();
+  const { session, role } = useAuth();
+  const navigate = useNavigate();
   const userId = session?.user?.id ?? null;
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
