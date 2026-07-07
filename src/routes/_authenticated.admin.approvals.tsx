@@ -154,7 +154,16 @@ function ApprovalsPage() {
             {items.map((a) => {
               const t = a.ticket as any;
               return (
-                <Card key={a.id} className="shadow-sm">
+                <Card
+                  key={a.id}
+                  id={`approval-${a.id}`}
+                  className={`shadow-sm transition ${
+                    highlightId && a.ticket_id === highlightId
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : ""
+                  }`}
+                >
+
                   <CardHeader className="pb-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
