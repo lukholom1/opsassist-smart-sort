@@ -107,6 +107,26 @@ export function NotificationsBell() {
     await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
   }
 
+  async function handleClick(n: Notif) {
+    setOpen(false);
+    // Mark as read but don't block navigation on the network round-trip.
+    if (!n.read_at) markOneRead(n.id).catch(() => {});
+    try {
+      const target = getNotificationTarget(n, role);
+      await navigate({
+        to: target.to,
+        search: target.search as never,
+        hash: target.hash,
+      });
+    } catch (e) {
+      console.error("[notifications] navigation failed", e);
+      toast.error("That item is no longer available", {
+        description: "Returning you to your dashboard.",
+      });
+      navigate({ to: role === "admin" ? "/admin" : "/dashboard" }).catch(() => {});
+    }
+  }
+
   if (!userId) return null;
 
   return (
