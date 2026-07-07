@@ -52,6 +52,10 @@ import { TicketDetailsDialog } from "@/components/TicketDetailsDialog";
 
 export const Route = createFileRoute("/_authenticated/admin/tickets")({
   head: () => ({ meta: [{ title: "Tickets — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    ticket: typeof s.ticket === "string" ? s.ticket : undefined,
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+  }),
   component: AdminTicketsPage,
 });
 
