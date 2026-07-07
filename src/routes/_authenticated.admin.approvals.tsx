@@ -22,6 +22,9 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin/approvals")({
   head: () => ({ meta: [{ title: "Approvals — OpsAssist" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    highlight: typeof s.highlight === "string" ? s.highlight : undefined,
+  }),
   component: ApprovalsPage,
 });
 
