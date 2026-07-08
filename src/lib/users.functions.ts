@@ -105,7 +105,10 @@ export const createPendingUser = createServerFn({ method: "POST" })
 // ---- Admin: list users ----
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can view users.");
+    }
     const { data: profiles } = await supabaseAdmin
       .from("profiles")
       .select("*")
