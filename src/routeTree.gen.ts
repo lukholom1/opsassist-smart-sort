@@ -20,6 +20,7 @@ import { Route as AuthenticatedAdminPredictionsRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminInsightsRouteImport } from './routes/_authenticated.admin.insights'
 import { Route as AuthenticatedAdminComplianceRouteImport } from './routes/_authenticated.admin.compliance'
 import { Route as AuthenticatedAdminApprovalsRouteImport } from './routes/_authenticated.admin.approvals'
+import { Route as ApiPublicHooksAdminMessageFollowupRouteImport } from './routes/api/public/hooks/admin-message-followup'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -80,6 +81,12 @@ const AuthenticatedAdminApprovalsRoute =
     path: '/approvals',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiPublicHooksAdminMessageFollowupRoute =
+  ApiPublicHooksAdminMessageFollowupRouteImport.update({
+    id: '/api/public/hooks/admin-message-followup',
+    path: '/api/public/hooks/admin-message-followup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
+  '/api/public/hooks/admin-message-followup': typeof ApiPublicHooksAdminMessageFollowupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -104,6 +112,7 @@ export interface FileRoutesByTo {
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
+  '/api/public/hooks/admin-message-followup': typeof ApiPublicHooksAdminMessageFollowupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,6 +127,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/_authenticated/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/_authenticated/admin/tickets': typeof AuthenticatedAdminTicketsRoute
+  '/api/public/hooks/admin-message-followup': typeof ApiPublicHooksAdminMessageFollowupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
+    | '/api/public/hooks/admin-message-followup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
+    | '/api/public/hooks/admin-message-followup'
   id:
     | '__root__'
     | '/'
@@ -157,12 +169,14 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/insights'
     | '/_authenticated/admin/predictions'
     | '/_authenticated/admin/tickets'
+    | '/api/public/hooks/admin-message-followup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiPublicHooksAdminMessageFollowupRoute: typeof ApiPublicHooksAdminMessageFollowupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -244,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminApprovalsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/public/hooks/admin-message-followup': {
+      id: '/api/public/hooks/admin-message-followup'
+      path: '/api/public/hooks/admin-message-followup'
+      fullPath: '/api/public/hooks/admin-message-followup'
+      preLoaderRoute: typeof ApiPublicHooksAdminMessageFollowupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -286,6 +307,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiPublicHooksAdminMessageFollowupRoute:
+    ApiPublicHooksAdminMessageFollowupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -118,6 +118,69 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_admin_message_notifications: {
+        Row: {
+          admin_name: string | null
+          cancelled_at: string | null
+          created_at: string
+          id: string
+          message_preview: string | null
+          note_id: string
+          notify_at: string
+          sent_at: string | null
+          ticket_id: string
+          ticket_title: string
+          user_email: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          admin_name?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          message_preview?: string | null
+          note_id: string
+          notify_at: string
+          sent_at?: string | null
+          ticket_id: string
+          ticket_title: string
+          user_email: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          admin_name?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          message_preview?: string | null
+          note_id?: string
+          notify_at?: string
+          sent_at?: string | null
+          ticket_id?: string
+          ticket_title?: string
+          user_email?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_admin_message_notifications_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_admin_message_notifications_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

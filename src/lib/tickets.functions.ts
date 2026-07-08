@@ -1005,9 +1005,63 @@ export const addTicketNote = createServerFn({ method: "POST" })
     // Admin interaction: auto-promote Open → In Progress.
     if (role === "admin") {
       await promoteToInProgress(data.ticket_id, context.userId);
+      await queueAdminMessageFollowup({
+        ticketId: data.ticket_id,
+        noteId: (row as TicketNote).id,
+        adminName: name,
+        messagePreview: data.body,
+      });
+    } else if (role === "user") {
+      // User replied — cancel any pending follow-up emails for them on this ticket.
+      await supabaseAdmin
+        .from("pending_admin_message_notifications")
+        .update({ cancelled_at: new Date().toISOString() })
+        .eq("ticket_id", data.ticket_id)
+        .eq("user_id", context.userId)
+        .is("sent_at", null)
+        .is("cancelled_at", null);
     }
     return { note: row as TicketNote };
   });
+
+// Queue a 2-minute delayed follow-up email to the ticket requester.
+// If the user replies before the window expires, the row is cancelled
+// (see addTicketNote user branch above). The public cron endpoint
+// /api/public/hooks/admin-message-followup flushes due rows every minute.
+async function queueAdminMessageFollowup(opts: {
+  ticketId: string;
+  noteId: string;
+  adminName: string;
+  messagePreview: string;
+}): Promise<void> {
+  const { data: t } = await supabaseAdmin
+    .from("tickets")
+    .select("id, title, user_id, user_name")
+    .eq("id", opts.ticketId)
+    .maybeSingle();
+  if (!t?.user_id) return;
+
+  const { data: requester } = await supabaseAdmin
+    .from("profiles")
+    .select("email, full_name")
+    .eq("id", t.user_id)
+    .maybeSingle();
+  if (!requester?.email) return;
+
+  const notifyAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+  await supabaseAdmin.from("pending_admin_message_notifications").insert({
+    ticket_id: opts.ticketId,
+    note_id: opts.noteId,
+    user_id: t.user_id,
+    user_email: requester.email,
+    user_name: requester.full_name ?? t.user_name ?? null,
+    ticket_title: t.title,
+    admin_name: opts.adminName,
+    message_preview: opts.messagePreview.slice(0, 1000),
+    notify_at: notifyAt,
+  });
+}
+
 
 // ----------------------------- Auto status: Open → In Progress -----------------------------
 
