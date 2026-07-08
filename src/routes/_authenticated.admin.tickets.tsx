@@ -237,12 +237,6 @@ function AdminTicketsPage() {
                 Back
               </Link>
             </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link to="/admin/insights">
-                <BarChart3 size={14} className="mr-1.5" />
-                Insights
-              </Link>
-            </Button>
             <span className="hidden text-sm text-muted-foreground sm:inline">
               {fullName ?? "Admin"}{" "}
               {department && (
