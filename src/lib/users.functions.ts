@@ -55,7 +55,10 @@ const CreatePendingSchema = z
 export const createPendingUser = createServerFn({ method: "POST" })
   .middleware([requireRole(["admin"])])
   .inputValidator((input: unknown) => CreatePendingSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can create users.");
+    }
     const email = normalizeEmail(data.email);
 
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
@@ -102,7 +105,10 @@ export const createPendingUser = createServerFn({ method: "POST" })
 // ---- Admin: list users ----
 export const listUsers = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    if ((context as { department: string | null }).department !== null) {
+      throw new Error("Only the super admin can view users.");
+    }
     const { data: profiles } = await supabaseAdmin
       .from("profiles")
       .select("*")

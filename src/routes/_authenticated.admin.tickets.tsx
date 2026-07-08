@@ -36,7 +36,7 @@ import {
   Search,
   Bot,
   MessageSquare,
-  BarChart3,
+  
   ArrowRightLeft,
   ArrowLeft,
 } from "lucide-react";
@@ -235,12 +235,6 @@ function AdminTicketsPage() {
               <Link to="/admin">
                 <ArrowLeft size={14} className="mr-1.5" />
                 Back
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link to="/admin/insights">
-                <BarChart3 size={14} className="mr-1.5" />
-                Insights
               </Link>
             </Button>
             <span className="hidden text-sm text-muted-foreground sm:inline">
