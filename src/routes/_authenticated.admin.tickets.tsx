@@ -36,7 +36,7 @@ import {
   Search,
   Bot,
   MessageSquare,
-  BarChart3,
+  
   ArrowRightLeft,
   ArrowLeft,
 } from "lucide-react";
