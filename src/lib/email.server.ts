@@ -228,8 +228,17 @@ function accentFor(event: TicketEmailEvent): "primary" | "success" | "danger" | 
 function formatDate(d?: string | null): string {
   if (!d) return "—";
   try {
-    return new Date(d).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
-  } catch { return d; }
+    // South African Standard Time (UTC+2, no DST).
+    return (
+      new Date(d).toLocaleString("en-ZA", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Africa/Johannesburg",
+      }) + " SAST"
+    );
+  } catch {
+    return d;
+  }
 }
 
 /**
