@@ -29,12 +29,13 @@ type Mode = "signin" | "activate" | "forgot";
 function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   return (
-    <div className="grid min-h-screen place-items-center px-6 py-12">
+    <div className="grid min-h-screen place-items-center px-4 sm:px-6 py-8 sm:py-12">
       <div className="w-full max-w-md">
         <div className="mb-6 flex justify-center">
           <Logo size="lg" />
         </div>
-        <div className="rounded-2xl border border-border bg-card p-8 shadow-[var(--shadow-soft)]">
+        <div className="rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-[var(--shadow-soft)]">
+
           {mode === "signin" && (
             <SignInForm
               onActivate={() => setMode("activate")}
