@@ -106,7 +106,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       supabaseAdmin
         .from("tickets")
         .select(
-          "id, title, created_at, status, priority, category, categories, resolved_at, resolved_by_ai, resolution_source",
+          "id, title, details, created_at, status, priority, category, categories, resolved_at, resolved_by_ai, resolution_source",
         )
         .order("created_at", { ascending: false })
         .limit(2000),
