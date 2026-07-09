@@ -1017,6 +1017,26 @@ export const addTicketNote = createServerFn({ method: "POST" })
     if (ticket.status === "Resolved") {
       throw new Error("This ticket is resolved — the conversation is closed.");
     }
+    // Content moderation: block strong language for both users AND admins,
+    // and log the attempt to ticket_activity so it shows up in compliance.
+    const { detectStrongLanguage } = await import("./moderation");
+    const mod = detectStrongLanguage(data.body);
+    if (mod.flagged) {
+      await supabaseAdmin.from("ticket_activity").insert({
+        ticket_id: data.ticket_id,
+        actor_id: context.userId,
+        actor_name: name,
+        actor_role: role,
+        event_type: "strong_language_blocked",
+        description: `Blocked ${role === "admin" ? "admin" : "user"} message for strong language`,
+        metadata: { matches: mod.matches.slice(0, 8), channel: "note" },
+      });
+      throw new Error(
+        role === "admin"
+          ? "Message not sent — please keep communication respectful and professional. Rephrase without strong or offensive language."
+          : "Message not sent — please keep messages respectful. Rephrase without strong or offensive language and try again.",
+      );
+    }
     const { data: row, error } = await supabaseAdmin
       .from("ticket_notes")
       .insert({
@@ -1050,6 +1070,7 @@ export const addTicketNote = createServerFn({ method: "POST" })
     }
     return { note: row as TicketNote };
   });
+
 
 // Queue a 2-minute delayed follow-up email to the ticket requester.
 // If the user replies before the window expires, the row is cancelled
