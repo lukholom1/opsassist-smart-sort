@@ -820,6 +820,24 @@ export const askTicketBot = createServerFn({ method: "POST" })
       .maybeSingle();
     const userName = profile?.full_name ?? "User";
 
+    // Content moderation on the user's chatbot message.
+    const { detectStrongLanguage, STRONG_LANGUAGE_ADVISORY } = await import("./moderation");
+    const mod = detectStrongLanguage(data.message);
+    if (mod.flagged) {
+      await supabaseAdmin.from("ticket_activity").insert({
+        ticket_id: data.ticket_id,
+        actor_id: context.userId,
+        actor_name: userName,
+        actor_role: "user",
+        event_type: "strong_language_blocked",
+        description: "Blocked user message to AI chatbot for strong language",
+        metadata: { matches: mod.matches.slice(0, 8), channel: "chatbot" },
+      });
+      throw new Error(
+        `${STRONG_LANGUAGE_ADVISORY} Your message wasn't sent — please rephrase and try again.`,
+      );
+    }
+
     await supabaseAdmin.from("ticket_notes").insert({
       ticket_id: data.ticket_id,
       author_id: context.userId,
@@ -827,6 +845,7 @@ export const askTicketBot = createServerFn({ method: "POST" })
       author_role: "user",
       body: data.message,
     });
+
 
     const [{ data: notes }, { data: assignments }] = await Promise.all([
       supabaseAdmin
