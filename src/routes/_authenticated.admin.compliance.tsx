@@ -64,6 +64,7 @@ function CompliancePage() {
       `- High-risk cases: ${data.totals.highRisk}`,
       `- Human reviews required: ${data.totals.humanReviews}`,
       `- Rejected AI suggestions: ${data.totals.rejectedAiCount}`,
+      `- Language moderation flags: ${data.totals.languageFlags}`,
       ``,
       `## Frequently Rejected Categories`,
       ...data.topRejectedCategories.map((c) => `- ${c.category}: ${c.count}`),
