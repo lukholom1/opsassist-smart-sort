@@ -1,96 +1,80 @@
-# OpsAssist Enterprise Enhancement Plan
+# Approval Workflow Refactor
 
-Extending the existing system (no rebuild). All tickets stay in one `tickets` table; we add per-department assignments, department-scoped admins, controlled AI, email OTP, and ratings.
+Extends the existing `workflow_*` tables, `workflow.functions.ts` API, `/admin/approvals` page, `WorkflowProgress` component, and ticket details dialog. No new modules, no duplicate pages, ticket ownership never changes.
 
-## 1. Database changes (migration)
+## 1. Database (single migration)
 
-**Schema changes:**
-- `profiles`: add `department text` (nullable; only set for Department Admins).
-- New enum/check: departments = `HR | IT | Finance | Operations`.
-- Drop the old `it_personnel` role usage in favor of a single `admin` role + `profiles.department`. Keep `admin` and `employee` in the enum (no migration of enum needed — we just stop creating `it_personnel`). Existing admin (global) = admin with `department = NULL` (super admin).
-- New table `ticket_assignments`:
-  - `id uuid pk`
-  - `ticket_id uuid → tickets`
-  - `department text` (HR/IT/Finance/Ops)
-  - `assigned_to uuid` (department admin user, nullable)
-  - `status text default 'Open'` (Open/In Progress/Resolved)
-  - `resolved_at timestamptz`
-  - `resolved_by_ai bool default false`
-  - unique(ticket_id, department)
-- New table `ticket_feedback`:
-  - `ticket_id uuid pk → tickets`
-  - `user_id uuid`
-  - `rating int 1..5`
-  - `comment text`
-  - `created_at`
-- `tickets`: keep `category` for backward compat but add `categories text[]` (multi-dept). Add `resolution_source text` ('ai' | 'department' | null).
-- `pending_activations`: already has email + otp. We'll send OTP via Resend.
+Extend the existing tables — no replacements.
 
-**RLS:**
-- `ticket_assignments`: admins can SELECT where `department = caller's profile.department` OR caller is super admin (department NULL). Employees can SELECT where they own the parent ticket. Admins can UPDATE rows in their department.
-- `tickets` SELECT: owner, super admin, or admin whose department appears in `categories`.
-- `ticket_feedback`: owner inserts/selects; admins read for tickets in their dept.
-- Helper SQL function `user_department(uid)` (security definer).
+- `workflow_approvals`: add
+  - `origin_department text` — the department that originally raised this approval (never changes on delegation).
+  - `delegated_from_id uuid null references workflow_approvals(id)` — set when this row is a delegated child.
+  - `delegated_to_id uuid null` — set on the parent row when it delegates; points to the child.
+  - `awaiting_delegation boolean default false` — true on the parent while the child is pending.
+  - `assigned_user_id uuid null` — specific employee approver (optional, in addition to department).
+  - `sequence int default 0` — display order in timeline.
+- `tickets`: add `approval_lock boolean default false` (mirrors "any active approval") — cheap read for the ticket UI. Maintained by a trigger on `workflow_approvals` insert/update/delete: set true if any row for the ticket is `pending` OR `awaiting_delegation`, otherwise false.
+- Trigger `workflow_approvals_touch_lock` maintains `approval_lock` and also flips `workflow_skipped` back to `false` when a new approval is inserted.
 
-**Trigger:** when all `ticket_assignments` for a ticket are `Resolved`, set parent `tickets.status = 'Resolved'`, `resolved_at = now()`.
+## 2. Server functions (`src/lib/workflow.functions.ts`)
 
-## 2. Server functions (`src/lib/tickets.functions.ts`)
+Extend, do not rewrite.
 
-- `classifyWithAI` → returns `{ categories: string[], priority }` (multi-dept). Heuristic fallback also returns arrays.
-- `submitTicket`: after classifying, insert ticket with `categories` array (keep `category` = first), then create one `ticket_assignments` row per category, each auto-assigned via `pickLeastBusyAdminForDept(dept)`.
-- `pickLeastBusyAdminForDept(dept)`: scope to admins with that `profiles.department`, count active assignments.
-- `updateAssignmentStatus({ assignment_id, status })`: dept admin updates one assignment; trigger handles full ticket resolution.
-- `listMyTickets`: include nested assignments.
-- `listDeptTickets`: for dept admins — assignments where `department = my dept`, joined with ticket + requester.
-- `listAllTickets`: super admin only.
-- `markResolvedByAI`: mark ticket resolved + all open assignments resolved with `resolved_by_ai=true`, set `resolution_source='ai'`.
-- `submitFeedback({ ticket_id, rating, comment })`.
-- `generateTicketResponse`: tighten system prompt — only HR/IT/Finance/Ops topics; refuse unrelated. Per-department guardrails (HR/Finance escalation only; IT troubleshoot; Ops procedural). Auto-tone preserved.
+- `requestManualApprovals` (existing): accept new optional `assigned_user_id` per department; write `origin_department = department`. Trigger locks the ticket.
+- `forwardApproval` (new): input `{ approval_id, to_department, to_user_id?, note }`. Marks the parent row `awaiting_delegation=true`, creates a child row referencing `delegated_from_id=parent.id`, copies `origin_department`, notifies target department/user, logs `approval_delegated` in `workflow_history`. Parent stays `pending` — accountable department must still approve at the end.
+- `decideApproval` (existing): when a **child** row is approved, do NOT close the parent — instead clear `awaiting_delegation` on the parent, notify the parent's original approvers ("delegate approved, your turn"), and log `delegation_returned`. On reject of a child, cascade a rejection prompt back to the parent (parent goes back to `pending`, `awaiting_delegation=false`, note attached). Approving the parent proceeds as today. Rejection of the parent rejects the whole chain (existing behavior).
+- `getTicketApprovalState` (existing): also return parent/child links + `assigned_user_id` + `origin_department`, and a computed `is_locked` boolean.
+- `listPendingApprovals` (existing): for a department admin, include (a) parent rows in their department whose `awaiting_delegation=false`, and (b) delegated child rows targeting their department or their user id. Exclude parents currently `awaiting_delegation` so they don't appear as actionable.
+- Add `resolveTicket` guard: in `tickets.functions.ts` `updateAssignmentStatus` and any resolve path, reject when `tickets.approval_lock` is true, returning a clear "Ticket is waiting for approval" error.
 
-## 3. User management (`src/lib/users.functions.ts`)
+## 3. Approvals dashboard (`_authenticated.admin.approvals.tsx`)
 
-- `createPendingUser({ email, full_name, role, department? })`:
-  - validate: if `role='admin'`, department required and in enum.
-  - generate 6-digit OTP, insert into `pending_activations` (store department + role).
-  - **Send OTP email via Resend** (new helper). If `RESEND_API_KEY` missing, fall back to returning OTP for admin to share (current behavior) + console log.
-- `activateAccount`: copy department onto profile.
+Extend existing page.
 
-## 4. Email OTP (Resend)
+- Card header shows: ticket title, ticket owner (assigned dept), requesting department (`origin_department`), reason, current stage label (Delegated / Pending your review / Awaiting delegate), submitted date.
+- Add **View Ticket** button (opens `TicketDetailsDialog` via existing route on tickets tab, or inline dialog).
+- Add **Forward Approval** button → dialog: pick department, optional user, note. Calls `forwardApproval`.
+- If the card is a delegated child, show a small chip "Delegated from {origin_department} · {parent approver name}".
+- Approve/Reject/Request info remain unchanged.
 
-- Add `RESEND_API_KEY` secret request.
-- Helper `sendOtpEmail(email, otp, fullName)` calling Resend `from: onboarding@resend.dev`.
-- Don't block account creation if email fails — still return OTP to admin UI as fallback.
+## 4. Ticket details / admin tickets tab
 
-## 5. Frontend
+- Add the two-button prompt at the top of `TicketDetailsDialog` for admins with no active workflow: **Request Approval** / **Skip Workflow** (Skip already exists via `skipWorkflow`; Request opens the existing request dialog).
+- Disable Resolve controls in `_authenticated.admin.tickets.tsx` when `ticket.approval_lock` is true; show an inline banner "Waiting for approval — resolution disabled".
+- Notes, chat, edits stay enabled.
 
-- **Admin dashboard (`_authenticated.admin.tsx`)**:
-  - Detect super admin (no department) vs department admin.
-  - Super admin: user creation form with role select (Employee/Department Admin) + dept picker when admin. Sees all tickets.
-  - Department admin: only sees `listDeptTickets`. Two tables (Active / Resolved) showing assignee, priority, categories, elapsed, rating, feedback. Status dropdown updates `ticket_assignments`.
-- **Employee dashboard (`_authenticated.dashboard.tsx`)**:
-  - Show per-department status pills under each ticket.
-  - When fully resolved & no feedback yet → show star rating form.
-  - AI chat → "Issue Resolved" button calls `markResolvedByAI`.
-- **IT route** (`_authenticated.it.tsx`): remove or repurpose — fold into admin (department admin handles it). Will delete it and route IT logins to `/admin`.
-- **Ticket bits**: add `DepartmentPills`, `RatingStars` components.
+## 5. Timeline (`WorkflowProgress` component)
 
-## 6. Controlled AI
+Enhance the existing timeline to render delegation as nested rows using `workflow_history` events already logged plus the new `approval_delegated` / `delegation_returned` actions:
 
-In `generateTicketResponse`, system prompt strictly scopes to four departments, refuses other topics with the canned redirect, and applies per-department behavior rules (HR empathetic-escalate, Finance formal-escalate, IT troubleshoot, Ops procedural).
+```text
+✓ IT Assessment
+✓ Finance Review
+  ↳ ✓ Delegated to CFO
+  ↳ ✓ CFO Approved
+✓ Finance Final Approval
+● IT Resolution
+○ Ticket Closed
+```
 
-## 7. Out of scope (explicit)
+Every action already includes actor, comment, timestamp — no schema change needed for the audit trail.
 
-- No separate per-department databases.
-- No changes to landing page or login flow beyond what's needed.
-- Keep existing admin seed (`Admin` / `OpsAdmin@2026`) as super admin (department NULL).
+## 6. End-user view (dashboard)
+
+`_authenticated.dashboard.tsx` already hides internal notes. Replace the raw approval statuses shown to the requester with a simplified progress list derived from `workflow_history` — collapse all delegation entries into a single "Awaiting approval" step so users never see internal delegation chatter.
 
 ## Files touched
-- new: `supabase/migrations/<ts>_multi_dept.sql`
-- new: `src/lib/email.server.ts` (Resend helper)
-- edit: `src/lib/tickets.functions.ts`, `src/lib/users.functions.ts`, `src/lib/auth-helpers.server.ts` (expose `department` in context)
-- edit: `src/routes/_authenticated.admin.tsx`, `_authenticated.dashboard.tsx`
-- delete: `src/routes/_authenticated.it.tsx`
-- edit: `src/components/ticket-bits.tsx` (add Rating + DeptPills)
-- edit: `src/hooks/use-auth.ts` (expose department)
 
-After approval I'll also request the `RESEND_API_KEY` secret.
+- new: `supabase/migrations/<ts>_approval_delegation.sql`
+- edit: `src/lib/workflow.functions.ts` (add `forwardApproval`, extend decide/list/state)
+- edit: `src/lib/tickets.functions.ts` (guard resolve when locked)
+- edit: `src/integrations/supabase/types.ts` (auto-regen after migration)
+- edit: `src/routes/_authenticated.admin.approvals.tsx` (Forward, View Ticket, delegation chip)
+- edit: `src/routes/_authenticated.admin.tickets.tsx` (Request/Skip prompt, disable Resolve when locked)
+- edit: `src/components/TicketDetailsDialog.tsx` (Request/Skip prompt for admins)
+- edit: `src/components/WorkflowProgress.tsx` (nested delegation rendering)
+- edit: `src/routes/_authenticated.dashboard.tsx` (simplified end-user progress)
+
+## Out of scope
+
+AI-recommended workflows, templates UI, escalation timers, analytics — the schema and API leave hooks for these but no UI is built now.
