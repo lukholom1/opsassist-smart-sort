@@ -166,7 +166,7 @@ export function AdminCharts({ data }: { data: Analytics }) {
   const gridStroke = "var(--border)";
 
   return (
-    <div className="mx-auto grid max-w-7xl gap-4 px-6 pb-2 lg:grid-cols-3">
+    <div className="mx-auto grid max-w-7xl gap-4 px-4 sm:px-6 pb-2 md:grid-cols-2 lg:grid-cols-3">
       <ChartCard
         title="Traffic Analysis"
         subtitle="Tickets per business hour (Mon–Sat · 8–17), by priority"
