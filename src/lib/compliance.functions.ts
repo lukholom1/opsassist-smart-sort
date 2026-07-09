@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { detectStrongLanguage } from "./moderation";
 
 type RiskLevel = "Low" | "Medium" | "High";
 
