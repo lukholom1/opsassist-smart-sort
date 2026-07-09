@@ -207,7 +207,6 @@ function DashboardPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                       <CategoryPills values={t.categories} />
                       <PriorityPill value={t.priority} />
-                      <StatusPill value={t.status} />
                       <span className="text-muted-foreground">· {elapsed(t.created_at, t.resolved_at)}</span>
                     </div>
                     {t.assignments.length > 0 && (
