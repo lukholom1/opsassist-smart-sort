@@ -715,15 +715,21 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
     const tone: Tone =
       data.tone ?? autoTone(data.categories, data.priority, `${data.title} ${data.details}`);
 
+    const { detectStrongLanguage, STRONG_LANGUAGE_ADVISORY } = await import("./moderation");
+    const moderation = detectStrongLanguage(`${data.title}\n${data.details}`);
+
     const finalize = async (response: string, source: "ai" | "template") => {
+      const finalResponse = moderation.flagged
+        ? `${STRONG_LANGUAGE_ADVISORY}\n\n${response}`
+        : response;
       if (data.ticket_id) {
         try {
-          await persistAiNoteIfFirst(data.ticket_id, response);
+          await persistAiNoteIfFirst(data.ticket_id, finalResponse);
         } catch {
           /* ignore note persistence errors */
         }
       }
-      return { response, source, tone };
+      return { response: finalResponse, source, tone };
     };
 
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -732,13 +738,19 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
     }
 
     const behavior = data.categories.map((c) => DEPT_BEHAVIOR[c]).join(" ");
+    const moderationDirective = moderation.flagged
+      ? "IMPORTANT: The user's message contains inappropriate or strong language. Begin your reply with a brief, polite advisory asking them to keep communication respectful and professional, then still help them with their request."
+      : "";
     const system = [
       `You are OpsAssist, an enterprise support assistant. You MAY ONLY discuss HR, IT, Finance, or Operations topics. If the user's request is not related to those four departments, reply EXACTLY: "${ALLOWED_TOPIC_REFUSAL}"`,
       "Be concise: 60–140 words.",
       "Tone: " + tone + ".",
       behavior,
+      moderationDirective,
       "Always acknowledge, confirm the ticket exists in the system, and outline next steps. No markdown. Sign off as the team.",
-    ].join(" ");
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -764,6 +776,7 @@ export const generateTicketResponse = createServerFn({ method: "POST" })
       return finalize(templateResponse({ ...data, tone }), "template");
     }
   });
+
 
 // ----------------------------- Ticket-aware Chatbot -----------------------------
 
