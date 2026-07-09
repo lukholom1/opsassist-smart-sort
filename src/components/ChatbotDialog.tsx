@@ -59,6 +59,8 @@ export function ChatbotDialog({
   const listFn = useServerFn(listTicketNotes);
   const addNoteFn = useServerFn(addTicketNote);
   const askBotFn = useServerFn(askTicketBot);
+  const approvalStateFn = useServerFn(getTicketApprovalState);
+  const respondInfoFn = useServerFn(respondToApprovalInfoRequest);
 
   const deptAdmins = (() => {
     const seen = new Set<string>();
@@ -81,6 +83,12 @@ export function ChatbotDialog({
   const [aiThinking, setAiThinking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [escalated, setEscalated] = useState(false);
+  const [infoApprovals, setInfoApprovals] = useState<
+    { id: string; department: string | null; decision_note: string | null; decided_by_name: string | null }[]
+  >([]);
+  const [infoReplies, setInfoReplies] = useState<Record<string, string>>({});
+  const [infoBusyId, setInfoBusyId] = useState<string | null>(null);
+  const [infoErr, setInfoErr] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const selectedAdmin = deptAdmins.find((d) => d.department === selectedDept) ?? deptAdmins[0];
@@ -90,9 +98,26 @@ export function ChatbotDialog({
 
   async function refresh() {
     try {
-      const r = await listFn({ data: { ticket_id: ticketId } });
+      const [r, s] = await Promise.all([
+        listFn({ data: { ticket_id: ticketId } }),
+        approvalStateFn({ data: { ticket_id: ticketId } }).catch(() => null),
+      ]);
       setNotes(r.notes);
       setLocked(r.locked);
+      if (s && Array.isArray((s as any).approvals)) {
+        setInfoApprovals(
+          ((s as any).approvals as any[])
+            .filter((a) => a.status === "info_requested")
+            .map((a) => ({
+              id: a.id,
+              department: a.department ?? null,
+              decision_note: a.decision_note ?? null,
+              decided_by_name: a.decided_by_name ?? null,
+            })),
+        );
+      } else {
+        setInfoApprovals([]);
+      }
     } finally {
       setLoading(false);
       queueMicrotask(() => {
@@ -107,6 +132,23 @@ export function ChatbotDialog({
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
+
+  async function submitInfo(approvalId: string) {
+    const message = (infoReplies[approvalId] ?? "").trim();
+    if (!message || infoBusyId) return;
+    setInfoBusyId(approvalId);
+    setInfoErr(null);
+    try {
+      await respondInfoFn({ data: { approval_id: approvalId, message } });
+      setInfoReplies((r) => ({ ...r, [approvalId]: "" }));
+      await refresh();
+    } catch (e) {
+      setInfoErr(e instanceof Error ? e.message : "Failed to send response.");
+    } finally {
+      setInfoBusyId(null);
+    }
+  }
+
 
   async function send() {
     if (!body.trim() || sending || locked) return;
