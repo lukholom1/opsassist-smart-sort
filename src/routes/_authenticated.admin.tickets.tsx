@@ -416,7 +416,8 @@ function TicketTable({
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[900px] text-sm">
+
         <thead>
           <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="px-4 py-3 font-medium">User</th>
