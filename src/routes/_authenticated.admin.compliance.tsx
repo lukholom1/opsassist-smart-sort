@@ -84,7 +84,7 @@ function CompliancePage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="rounded-lg">
@@ -104,7 +104,7 @@ function CompliancePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-start gap-3">
           <div className="rounded-2xl bg-purple-accent/15 p-2.5 text-purple-accent">
             <Shield size={22} />

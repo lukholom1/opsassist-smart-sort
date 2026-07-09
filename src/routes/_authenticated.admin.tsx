@@ -61,7 +61,7 @@ function AdminPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
           <div className="flex items-center gap-2">
             <Button asChild size="sm" className="rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95">
@@ -109,7 +109,7 @@ function AdminPage() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         <h1 className="text-2xl font-semibold tracking-tight">
           {isSuperAdmin ? "Admin dashboard" : `${department} dashboard`}
         </h1>
