@@ -230,7 +230,7 @@ function AdminTicketsPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="rounded-lg">
@@ -256,16 +256,16 @@ function AdminTicketsPage() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
           {isSuperAdmin ? "All tickets" : `${department} tickets`}
         </h1>
         <p className="text-sm text-muted-foreground">
           Active and resolved tickets, separated below.
         </p>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3">
-          <div className="relative min-w-[220px] flex-1">
+        <div className="mt-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 rounded-2xl border border-border bg-card p-3">
+          <div className="relative flex-1 min-w-0 sm:min-w-[220px]">
             <Search
               size={16}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -278,7 +278,7 @@ function AdminTicketsPage() {
             />
           </div>
           <Select value={filterPri} onValueChange={setFilterPri}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
             <SelectContent>
@@ -289,6 +289,7 @@ function AdminTicketsPage() {
             </SelectContent>
           </Select>
         </div>
+
 
         {loading ? (
           <div className="mt-8 flex items-center justify-center rounded-2xl border border-border bg-card py-16 text-muted-foreground">
@@ -415,7 +416,8 @@ function TicketTable({
   }
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full min-w-[900px] text-sm">
+
         <thead>
           <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
             <th className="px-4 py-3 font-medium">User</th>

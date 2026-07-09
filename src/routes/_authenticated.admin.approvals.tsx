@@ -155,7 +155,7 @@ function ApprovalsPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
           <Button asChild variant="outline" size="sm">
             <Link to="/admin">
@@ -165,7 +165,7 @@ function ApprovalsPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">Approvals</h1>
           <p className="text-muted-foreground mt-1">

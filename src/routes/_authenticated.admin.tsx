@@ -31,7 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ClipboardCheck } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ClipboardCheck, Menu } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -58,59 +65,69 @@ function AdminPage() {
     navigate({ to: "/login" });
   }
 
+  const navLinks = (
+    <>
+      <Button asChild size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95">
+        <Link to="/admin/tickets"><TicketCheck size={14} className="mr-1.5" />Tickets</Link>
+      </Button>
+      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg">
+        <Link to="/admin/insights"><BarChart3 size={14} className="mr-1.5" />Insights</Link>
+      </Button>
+      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10">
+        <Link to="/admin/approvals"><ClipboardCheck size={14} className="mr-1.5" />Approvals</Link>
+      </Button>
+      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
+        <Link to="/admin/predictions"><LineChart size={14} className="mr-1.5" />Predictions</Link>
+      </Button>
+      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
+        <Link to="/admin/compliance"><Shield size={14} className="mr-1.5" />Compliance</Link>
+      </Button>
+      {isSuperAdmin && (
+        <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="w-full sm:w-auto justify-start sm:justify-center rounded-lg">
+          <Users size={14} className="mr-1.5" /> Users
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
           <div className="flex items-center gap-2">
-            <Button asChild size="sm" className="rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95">
-              <Link to="/admin/tickets">
-                <TicketCheck size={14} className="mr-1.5" />
-                Tickets
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link to="/admin/insights">
-                <BarChart3 size={14} className="mr-1.5" />
-                Insights
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10">
-              <Link to="/admin/approvals">
-                <ClipboardCheck size={14} className="mr-1.5" />
-                Approvals
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
-              <Link to="/admin/predictions">
-                <LineChart size={14} className="mr-1.5" />
-                Predictions
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
-              <Link to="/admin/compliance">
-                <Shield size={14} className="mr-1.5" />
-                Compliance
-              </Link>
-            </Button>
-            {isSuperAdmin && (
-              <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="rounded-lg">
-                <Users size={14} className="mr-1.5" /> Users
-              </Button>
-            )}
+            {/* Desktop nav */}
+            <div className="hidden lg:flex items-center gap-2">{navLinks}</div>
             <NotificationsBell />
-            <span className="hidden text-sm text-muted-foreground sm:inline">
+            <span className="hidden xl:inline text-sm text-muted-foreground truncate max-w-[180px]">
               {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
             </span>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
+            <Button variant="outline" size="sm" onClick={handleSignOut} className="hidden sm:inline-flex rounded-lg">
               <LogOut size={14} className="mr-1.5" /> Sign out
             </Button>
+            {/* Mobile menu */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="lg:hidden rounded-lg" aria-label="Open menu">
+                  <Menu size={18} />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[85vw] max-w-sm flex flex-col gap-3">
+                <SheetHeader><SheetTitle>Menu</SheetTitle></SheetHeader>
+                <div className="text-sm text-muted-foreground">
+                  {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
+                </div>
+                <div className="flex flex-col gap-2">{navLinks}</div>
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="justify-start rounded-lg mt-2">
+                  <LogOut size={14} className="mr-1.5" /> Sign out
+                </Button>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <h1 className="text-2xl font-semibold tracking-tight">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
           {isSuperAdmin ? "Admin dashboard" : `${department} dashboard`}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -170,7 +187,7 @@ function TicketAnalyticsSection() {
             Loading ticket analytics…
           </div>
         ) : data ? (
-          <div className="-mx-6">
+          <div className="-mx-4 sm:-mx-6 overflow-x-auto">
             <AdminCharts data={data} />
           </div>
         ) : (
@@ -442,7 +459,8 @@ function UsersDialog({ onClose }: { onClose: () => void }) {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading users...
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[600px] text-sm">
+
               <thead>
                 <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Name</th>
