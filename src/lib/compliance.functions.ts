@@ -278,12 +278,17 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         reasons.push("High-priority ticket with limited confidence");
       if (aiInvolved && t.status !== "Resolved" && !fb)
         reasons.push("AI recommendation pending human verification");
+      if (moderation.flagged)
+        reasons.push(
+          `Strong language flagged by content moderation (${moderation.matches.slice(0, 3).join(", ")})`,
+        );
 
       if (reasons.length) {
         const score =
           (effConf < 0.5 ? 2 : effConf < 0.7 ? 1 : 0) +
           (cats.length >= 3 ? 1 : 0) +
           (rejected ? 1 : 0) +
+          (moderation.flagged ? 2 : 0) +
           (t.priority === "High" ? priorityWeight(t.priority) - 1 : 0);
         const level: RiskLevel = score >= 3 ? "High" : score >= 1 ? "Medium" : "Low";
         risks.push({
