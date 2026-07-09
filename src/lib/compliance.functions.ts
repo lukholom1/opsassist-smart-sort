@@ -103,7 +103,8 @@ function priorityWeight(p: string): number {
 export const getComplianceReport = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
   .handler(async (): Promise<ComplianceReport> => {
-    const [ticketsRes, notesRes, assignRes, feedbackRes] = await Promise.all([
+    const [ticketsRes, notesRes, assignRes, feedbackRes, allNotesRes, activityRes] =
+      await Promise.all([
       supabaseAdmin
         .from("tickets")
         .select(
@@ -121,6 +122,18 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         .from("ticket_assignments")
         .select("ticket_id, department, status, resolved_by_ai"),
       supabaseAdmin.from("ticket_feedback").select("ticket_id, rating, comment, resolution_source"),
+      supabaseAdmin
+        .from("ticket_notes")
+        .select("id, ticket_id, author_role, author_name, body, created_at")
+        .in("author_role", ["user", "admin"])
+        .order("created_at", { ascending: false })
+        .limit(4000),
+      supabaseAdmin
+        .from("ticket_activity")
+        .select("id, ticket_id, actor_name, actor_role, event_type, description, metadata, created_at")
+        .eq("event_type", "strong_language_blocked")
+        .order("created_at", { ascending: false })
+        .limit(2000),
     ]);
 
     if (ticketsRes.error) throw new Error(ticketsRes.error.message);
@@ -128,6 +141,9 @@ export const getComplianceReport = createServerFn({ method: "GET" })
     const aiNotes = notesRes.data ?? [];
     const assignments = assignRes.data ?? [];
     const feedback = feedbackRes.data ?? [];
+    const convNotes = allNotesRes.data ?? [];
+    const modActivity = activityRes.data ?? [];
+
 
     const feedbackByTicket = new Map(feedback.map((f) => [f.ticket_id, f]));
     const aiNoteByTicket = new Map<string, (typeof aiNotes)[number]>();
