@@ -280,7 +280,7 @@ function DecisionLog({ entries }: { entries: DecisionEntry[] }) {
         </div>
       </div>
       <div className="mt-3 max-h-[420px] overflow-auto rounded-2xl border border-border bg-card/60">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="sticky top-0 bg-card/95 backdrop-blur">
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-medium">Timestamp</th>
@@ -409,7 +409,7 @@ function RiskTable({ rows }: { rows: RiskRow[] }) {
         Automatically flagged tickets based on confidence, conflicting categories, rejections, and priority.
       </p>
       <div className="mt-3 max-h-[360px] overflow-auto rounded-2xl border border-border bg-card/60">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="sticky top-0 bg-card/95 backdrop-blur">
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-medium">Ticket</th>
@@ -462,7 +462,7 @@ function ReviewQueue({ rows }: { rows: RiskRow[] }) {
         Unresolved tickets that require administrator attention, sorted by risk level.
       </p>
       <div className="mt-3 max-h-[320px] overflow-auto rounded-2xl border border-border bg-card/60">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="sticky top-0 bg-card/95 backdrop-blur">
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
               <th className="px-3 py-2 font-medium">Ticket ID</th>
