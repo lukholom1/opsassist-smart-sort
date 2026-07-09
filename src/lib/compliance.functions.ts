@@ -376,6 +376,10 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       recommendations.push(
         `User satisfaction is averaging ${avgRating}/5. Audit recent resolutions and follow up with affected users.`,
       );
+    if (totals.languageFlags > 0)
+      recommendations.push(
+        `${totals.languageFlags} ticket(s) contained strong or offensive language. The AI included a respectful-communication advisory in its response — consider following up if the pattern repeats from the same user.`,
+      );
     if (!recommendations.length)
       recommendations.push("AI performance is healthy. Continue monitoring for drift over time.");
 
