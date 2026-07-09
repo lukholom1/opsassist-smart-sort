@@ -142,32 +142,33 @@ function DashboardPage() {
       <header className="border-b border-border bg-card/40 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
           <Logo />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <NotificationsBell />
-            <span className="hidden text-sm text-muted-foreground sm:inline">
+            <span className="hidden text-sm text-muted-foreground md:inline truncate max-w-[180px]">
               Hi, <span className="font-medium text-foreground">{fullName ?? "there"}</span>
             </span>
             <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
-              <LogOut size={14} className="mr-1.5" /> Sign out
+              <LogOut size={14} className="mr-1.5" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">My tickets</h1>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">My tickets</h1>
             <p className="text-sm text-muted-foreground">
               Submit a new request and track its progress per department.
             </p>
           </div>
           <Button
             onClick={() => setShowForm(true)}
-            className="rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
+            className="w-full sm:w-auto rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
           >
             <Plus size={16} className="mr-1.5" /> New ticket
           </Button>
         </div>
+
 
         <div className="mt-6 grid gap-3">
           {loading ? (
