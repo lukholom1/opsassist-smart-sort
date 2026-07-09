@@ -217,6 +217,52 @@ export function ChatbotDialog({
           </button>
         </div>
 
+        {infoApprovals.length > 0 && !locked && (
+          <div className="space-y-3 rounded-xl border border-warning/40 bg-warning/10 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warning">
+              <HelpCircle size={14} /> More information requested
+            </div>
+            {infoApprovals.map((a) => (
+              <div key={a.id} className="space-y-2 rounded-lg bg-background/60 p-3 ring-1 ring-warning/20">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {a.decided_by_name ?? "An admin"}
+                  {a.department ? ` · ${a.department}` : ""} asked:
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {a.decision_note?.trim() || "Please provide additional information for this approval."}
+                </p>
+                <Textarea
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Share the requested details…"
+                  value={infoReplies[a.id] ?? ""}
+                  onChange={(e) =>
+                    setInfoReplies((r) => ({ ...r, [a.id]: e.target.value }))
+                  }
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    disabled={infoBusyId === a.id || !(infoReplies[a.id] ?? "").trim()}
+                    onClick={() => submitInfo(a.id)}
+                    className="rounded-full"
+                  >
+                    {infoBusyId === a.id ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send size={12} className="mr-1.5" />
+                    )}
+                    Send response
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {infoErr && <p className="text-xs text-destructive">{infoErr}</p>}
+          </div>
+        )}
+
+
+
         <div
           ref={scrollerRef}
           className="max-h-[50vh] min-h-[240px] space-y-3 overflow-y-auto rounded-xl border border-border bg-muted/30 p-3"
