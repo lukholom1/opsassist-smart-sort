@@ -321,7 +321,48 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       }
     }
 
+    // Blocked chat/notes messages caught by moderation.
+    const ticketTitleById = new Map(tickets.map((t: any) => [t.id, t.title as string]));
+    for (const ev of modActivity as any[]) {
+      languageFlags += 1;
+      const matches = Array.isArray(ev.metadata?.matches) ? ev.metadata.matches : [];
+      const channel = ev.metadata?.channel ?? "note";
+      decisions.push({
+        id: `${ev.id}-mod-msg`,
+        ts: ev.created_at,
+        ticketId: ev.ticket_id,
+        ticketShort: (ev.ticket_id ?? "").slice(0, 8),
+        ticketTitle: ticketTitleById.get(ev.ticket_id) ?? "Ticket",
+        action: "Content moderation",
+        detail: `Blocked ${ev.actor_role ?? "message"} on ${channel}${matches.length ? ` (${matches.slice(0, 3).join(", ")})` : ""}.`,
+        confidence: 0.95,
+      });
+    }
+
+    // Extra sweep: strong language actually posted in notes (belt-and-braces for
+    // messages older than moderation, or admin-side compliance oversight).
+    const seenNoteFlags = new Set<string>();
+    for (const n of convNotes as any[]) {
+      const m = detectStrongLanguage(n.body ?? "");
+      if (!m.flagged) continue;
+      languageFlags += 1;
+      const key = `${n.id}-note-mod`;
+      if (seenNoteFlags.has(key)) continue;
+      seenNoteFlags.add(key);
+      decisions.push({
+        id: key,
+        ts: n.created_at,
+        ticketId: n.ticket_id,
+        ticketShort: (n.ticket_id ?? "").slice(0, 8),
+        ticketTitle: ticketTitleById.get(n.ticket_id) ?? "Ticket",
+        action: "Content moderation",
+        detail: `Strong language detected in ${n.author_role} message (${m.matches.slice(0, 3).join(", ")}).`,
+        confidence: 0.9,
+      });
+    }
+
     decisions.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+
 
     // include prediction action (one synthetic per active day) — sourced from
     // actual ticket activity to stay non-hardcoded.
