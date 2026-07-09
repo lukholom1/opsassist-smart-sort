@@ -28,7 +28,7 @@ export const Route = createFileRoute("/")({
 
 function Landing() {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 sm:px-6">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div
           className="absolute -left-20 -top-20 h-[28rem] w-[28rem] rounded-full opacity-30 blur-[100px]"
@@ -43,7 +43,7 @@ function Landing() {
       <div className="relative z-10 flex flex-col items-center text-center">
         <Logo />
 
-        <h1 className="mt-10 max-w-3xl text-5xl font-bold tracking-tight text-foreground sm:text-6xl">
+        <h1 className="mt-8 sm:mt-10 max-w-3xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
           Support requests,
           <br />
           <span className="bg-gradient-to-r from-soft-blue to-purple-accent bg-clip-text text-transparent">
@@ -51,7 +51,8 @@ function Landing() {
           </span>
         </h1>
 
-        <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+        <p className="mt-5 sm:mt-6 max-w-xl text-base sm:text-lg leading-relaxed text-muted-foreground">
+
           OpsAssist uses AI to classify, route, and respond to internal tickets.
         </p>
 
