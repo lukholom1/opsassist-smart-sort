@@ -187,7 +187,7 @@ function TicketAnalyticsSection() {
             Loading ticket analytics…
           </div>
         ) : data ? (
-          <div className="-mx-6">
+          <div className="-mx-4 sm:-mx-6 overflow-x-auto">
             <AdminCharts data={data} />
           </div>
         ) : (
