@@ -31,7 +31,6 @@ import {
   elapsed,
   CategoryPills,
   PriorityPill,
-  StatusPill,
   DepartmentStatusPills,
   RatingStars,
 } from "@/components/ticket-bits";
