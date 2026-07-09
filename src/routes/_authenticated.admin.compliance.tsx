@@ -163,10 +163,11 @@ function Overview({ data }: { data: ComplianceReport }) {
           <Kpi key={c.label} {...c} />
         ))}
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs text-muted-foreground">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5 text-xs text-muted-foreground">
         <Stat label="Average confidence" value={`${(t.avgConfidence * 100).toFixed(0)}%`} />
         <Stat label="Resolved by AI" value={String(t.resolvedByAi)} />
         <Stat label="Rejected suggestions" value={String(t.rejectedAiCount)} />
+        <Stat label="Language flags" value={String(t.languageFlags)} />
         <Stat label="Average rating" value={t.avgRating == null ? "—" : `${t.avgRating}/5`} />
       </div>
     </section>
