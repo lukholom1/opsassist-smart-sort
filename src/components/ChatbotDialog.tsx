@@ -8,6 +8,10 @@ import {
   type TicketNote,
 } from "@/lib/tickets.functions";
 import {
+  getTicketApprovalState,
+  respondToApprovalInfoRequest,
+} from "@/lib/workflow.functions";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,7 +20,17 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Bot, Loader2, Lock, MessageSquare, Send, Sparkles, Users } from "lucide-react";
+import {
+  Bot,
+  HelpCircle,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Users,
+} from "lucide-react";
+
 
 function relTime(iso: string) {
   const d = new Date(iso);
