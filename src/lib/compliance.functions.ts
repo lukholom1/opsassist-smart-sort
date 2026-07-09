@@ -159,6 +159,22 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       const aiInvolved = !!aiNote || t.resolved_by_ai || t.resolution_source === "ai";
       const solConf = aiNote ? solutionConfidence(aiNote.body, fb?.rating ?? null) : null;
       const ticketShort = t.id.slice(0, 8);
+      const moderation = detectStrongLanguage(`${t.title ?? ""}\n${t.details ?? ""}`);
+      if (moderation.flagged) {
+        languageFlags += 1;
+        decisions.push({
+          id: `${t.id}-mod`,
+          ts: t.created_at,
+          ticketId: t.id,
+          ticketShort,
+          ticketTitle: t.title,
+          action: "Content moderation",
+          detail: `Strong language detected (${moderation.matches.slice(0, 3).join(", ")}${moderation.matches.length > 3 ? "…" : ""}). Advisory added to AI response.`,
+          confidence: 0.95,
+        });
+      }
+
+
 
       // decision log entries
       decisions.push({
