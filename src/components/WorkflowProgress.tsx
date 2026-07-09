@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getTicketWorkflow,
@@ -8,12 +8,15 @@ import {
   skipWorkflow,
   unskipWorkflow,
   decideApproval,
+  forwardApproval,
+  listApproverCandidates,
   type WorkflowStage,
   type WorkflowApproval,
   type WorkflowHistoryRow,
   type TicketWorkflowRow,
   type WorkflowTemplate,
 } from "@/lib/workflow.functions";
+
 import {
   CheckCircle2,
   Circle,
@@ -27,7 +30,24 @@ import {
   MessageCircleQuestion,
   Building2,
   User as UserIcon,
+  Forward,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,8 +84,11 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   const skipFn = useServerFn(skipWorkflow);
   const unskipFn = useServerFn(unskipWorkflow);
   const decideFn = useServerFn(decideApproval);
+  const forwardFn = useServerFn(forwardApproval);
+  const listCandidatesFn = useServerFn(listApproverCandidates);
   const completeFn = useServerFn(completeCurrentOperationalStage);
   const { role, department, session } = useAuth();
+
 
   const [template, setTemplate] = useState<TemplateState>(null);
   const [manual, setManual] = useState<ManualState | null>(null);
@@ -84,8 +107,23 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
   // Per-approval decide notes.
   const [decideNote, setDecideNote] = useState<Record<string, string>>({});
 
+  // Forward dialog state (approval-id being forwarded).
+  const [forwardId, setForwardId] = useState<string | null>(null);
+  const [candidates, setCandidates] = useState<
+    { id: string; name: string; department: string | null }[]
+  >([]);
+
   const isAdmin = role === "admin";
   const userId = session?.user?.id ?? null;
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    listCandidatesFn()
+      .then((r: any) => setCandidates(r.users ?? []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin]);
+
 
   const load = useCallback(async () => {
     try {
@@ -283,132 +321,180 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
         </p>
       )}
 
-      {/* Manual approvals list */}
+      {/* Manual approvals list — parents render with any delegated children nested underneath */}
       {approvals.length > 0 && (
         <ul className="grid gap-2">
-          {approvals.map((a) => {
-            const canDecide =
-              isAdmin &&
-              a.status === "pending" &&
-              ((a.approver_user_id && a.approver_user_id === userId) ||
-                (a.department && (!department || a.department === department)) ||
-                (a.department && department == null));
-            return (
-              <li
-                key={a.id}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-sm",
-                  a.status === "pending" && "border-warning/40 bg-warning/5",
-                  a.status === "approved" && "border-emerald-500/40 bg-emerald-500/5",
-                  a.status === "rejected" && "border-destructive/40 bg-destructive/5",
-                  a.status === "info_requested" && "border-primary/40 bg-primary/5",
-                )}
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {a.approver_user_id ? (
-                      <UserIcon size={14} className="text-muted-foreground" />
-                    ) : (
-                      <Building2 size={14} className="text-muted-foreground" />
-                    )}
-                    <span className="font-medium">
-                      {a.approver_name ?? a.department ?? "Approver"}
+          {(() => {
+            const parents = approvals.filter((a) => !a.delegated_from_id);
+            const childrenOf = new Map<string, typeof approvals>();
+            for (const a of approvals) {
+              if (a.delegated_from_id) {
+                const arr = childrenOf.get(a.delegated_from_id) ?? [];
+                arr.push(a);
+                childrenOf.set(a.delegated_from_id, arr);
+              }
+            }
+            const renderRow = (a: (typeof approvals)[number], isChild = false) => {
+              const canDecide =
+                isAdmin &&
+                a.status === "pending" &&
+                !a.awaiting_delegation &&
+                ((a.assigned_user_id && a.assigned_user_id === userId) ||
+                  (a.approver_user_id && a.approver_user_id === userId) ||
+                  (a.department && (!department || a.department === department)) ||
+                  (a.department && department == null));
+              const canForward = canDecide;
+              return (
+                <li
+                  key={a.id}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm",
+                    isChild && "ml-6 border-dashed",
+                    a.awaiting_delegation && "border-primary/40 bg-primary/5",
+                    !a.awaiting_delegation && a.status === "pending" && "border-warning/40 bg-warning/5",
+                    a.status === "approved" && "border-emerald-500/40 bg-emerald-500/5",
+                    a.status === "rejected" && "border-destructive/40 bg-destructive/5",
+                    a.status === "info_requested" && "border-primary/40 bg-primary/5",
+                  )}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {isChild && <Forward size={12} className="text-primary" />}
+                      {a.approver_user_id || a.assigned_user_id ? (
+                        <UserIcon size={14} className="text-muted-foreground" />
+                      ) : (
+                        <Building2 size={14} className="text-muted-foreground" />
+                      )}
+                      <span className="font-medium">
+                        {a.approver_name ?? a.department ?? "Approver"}
+                      </span>
+                      {a.department && a.approver_user_id && (
+                        <span className="text-xs text-muted-foreground">({a.department})</span>
+                      )}
+                      {isChild && a.origin_department && (
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                          from {a.origin_department}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                        a.awaiting_delegation && "bg-primary/20 text-primary",
+                        !a.awaiting_delegation && a.status === "pending" && "bg-warning/20 text-warning",
+                        a.status === "approved" && "bg-emerald-500/20 text-emerald-700",
+                        a.status === "rejected" && "bg-destructive/20 text-destructive",
+                        a.status === "info_requested" && "bg-primary/20 text-primary",
+                      )}
+                    >
+                      {a.awaiting_delegation
+                        ? "Awaiting delegate"
+                        : a.status.replace("_", " ")}
                     </span>
-                    {a.department && a.approver_user_id && (
-                      <span className="text-xs text-muted-foreground">({a.department})</span>
-                    )}
                   </div>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                      a.status === "pending" && "bg-warning/20 text-warning",
-                      a.status === "approved" && "bg-emerald-500/20 text-emerald-700",
-                      a.status === "rejected" && "bg-destructive/20 text-destructive",
-                      a.status === "info_requested" && "bg-primary/20 text-primary",
-                    )}
-                  >
-                    {a.status.replace("_", " ")}
-                  </span>
-                </div>
 
-                {a.request_note && (
-                  <div className="mt-2 rounded border border-border/60 bg-background/50 px-2 py-1.5 text-xs">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Reason for request
-                      {a.requested_by_name ? ` · ${a.requested_by_name}` : ""}
+                  {a.request_note && (
+                    <div className="mt-2 rounded border border-border/60 bg-background/50 px-2 py-1.5 text-xs">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Reason for request
+                        {a.requested_by_name ? ` · ${a.requested_by_name}` : ""}
+                      </div>
+                      <p className="mt-0.5 text-foreground">{a.request_note}</p>
                     </div>
-                    <p className="mt-0.5 text-foreground">{a.request_note}</p>
-                  </div>
-                )}
+                  )}
 
-                {a.decision_note && (
-                  <div
-                    className={cn(
-                      "mt-2 rounded border px-2 py-1.5 text-xs",
-                      a.status === "rejected"
-                        ? "border-destructive/40 bg-destructive/5"
-                        : "border-border/60 bg-background/50",
-                    )}
-                  >
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {a.status === "rejected"
-                        ? "Reason for rejection"
-                        : a.status === "info_requested"
-                          ? "Info requested"
-                          : "Decision note"}
+                  {a.decision_note && (
+                    <div
+                      className={cn(
+                        "mt-2 rounded border px-2 py-1.5 text-xs",
+                        a.status === "rejected"
+                          ? "border-destructive/40 bg-destructive/5"
+                          : "border-border/60 bg-background/50",
+                      )}
+                    >
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {a.status === "rejected"
+                          ? "Reason for rejection"
+                          : a.status === "info_requested"
+                            ? "Info requested"
+                            : "Decision note"}
+                      </div>
+                      <p className="mt-0.5 text-foreground">{a.decision_note}</p>
                     </div>
-                    <p className="mt-0.5 text-foreground">{a.decision_note}</p>
-                  </div>
-                )}
-                {a.decided_by_name && a.decided_at && (
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    by {a.decided_by_name} · {new Date(a.decided_at).toLocaleString()}
-                  </p>
-                )}
+                  )}
+                  {a.decided_by_name && a.decided_at && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      by {a.decided_by_name} · {new Date(a.decided_at).toLocaleString()}
+                    </p>
+                  )}
 
-                {canDecide && (
-                  <div className="mt-2 grid gap-2">
-                    <Textarea
-                      rows={2}
-                      placeholder="Add a comment (required when rejecting)…"
-                      value={decideNote[a.id] ?? ""}
-                      onChange={(e) =>
-                        setDecideNote((n) => ({ ...n, [a.id]: e.target.value }))
-                      }
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                        onClick={() => decide(a.id, "approve")}
-                        disabled={busy}
-                      >
-                        <CheckCircle2 size={14} className="mr-1.5" /> Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => decide(a.id, "reject")}
-                        disabled={busy}
-                      >
-                        <XCircle size={14} className="mr-1.5" /> Reject
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => decide(a.id, "info")}
-                        disabled={busy}
-                      >
-                        <MessageCircleQuestion size={14} className="mr-1.5" /> Request info
-                      </Button>
+                  {a.awaiting_delegation && (
+                    <p className="mt-2 text-[11px] italic text-primary">
+                      Waiting for the delegate to decide before you can finalise this approval.
+                    </p>
+                  )}
+
+                  {canDecide && (
+                    <div className="mt-2 grid gap-2">
+                      <Textarea
+                        rows={2}
+                        placeholder="Add a comment (required when rejecting)…"
+                        value={decideNote[a.id] ?? ""}
+                        onChange={(e) =>
+                          setDecideNote((n) => ({ ...n, [a.id]: e.target.value }))
+                        }
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                          onClick={() => decide(a.id, "approve")}
+                          disabled={busy}
+                        >
+                          <CheckCircle2 size={14} className="mr-1.5" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => decide(a.id, "reject")}
+                          disabled={busy}
+                        >
+                          <XCircle size={14} className="mr-1.5" /> Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => decide(a.id, "info")}
+                          disabled={busy}
+                        >
+                          <MessageCircleQuestion size={14} className="mr-1.5" /> Request info
+                        </Button>
+                        {canForward && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setForwardId(a.id)}
+                            disabled={busy}
+                          >
+                            <Forward size={14} className="mr-1.5" /> Forward
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+                  )}
+                </li>
+              );
+            };
+            const rows: React.ReactNode[] = [];
+            for (const p of parents) {
+              rows.push(renderRow(p, false));
+              for (const c of childrenOf.get(p.id) ?? []) rows.push(renderRow(c, true));
+            }
+            return rows;
+          })()}
         </ul>
       )}
+
 
       {/* Template-based (legacy) workflow — kept for tickets that already have one */}
       {template && <TemplateBlock data={template} isAdmin={isAdmin} department={department} busy={busy} onComplete={completeStage} />}
@@ -512,9 +598,148 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
           </div>
         </div>
       )}
+
+      {forwardId && (
+        <InlineForwardDialog
+          approval={approvals.find((a) => a.id === forwardId)!}
+          candidates={candidates}
+          onClose={() => setForwardId(null)}
+          onSubmit={async ({ to_department, to_user_id, note }) => {
+            setBusy(true);
+            try {
+              await forwardFn({
+                data: {
+                  approval_id: forwardId,
+                  to_department,
+                  to_user_id: to_user_id || undefined,
+                  note,
+                },
+              });
+              toast.success("Forwarded — the delegate has been notified.");
+              setForwardId(null);
+              await load();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Failed to forward");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
+
+function InlineForwardDialog({
+  approval,
+  candidates,
+  onClose,
+  onSubmit,
+}: {
+  approval: WorkflowApproval;
+  candidates: { id: string; name: string; department: string | null }[];
+  onClose: () => void;
+  onSubmit: (v: {
+    to_department: string;
+    to_user_id: string;
+    note: string;
+  }) => void | Promise<void>;
+}) {
+  const [dept, setDept] = useState<string>(
+    DEPARTMENTS.find((d) => d !== approval.department) ?? "Finance",
+  );
+  const [userId, setUserId] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const filtered = candidates.filter((c) => c.department === dept);
+
+  async function submit() {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      await onSubmit({ to_department: dept, to_user_id: userId, note: note.trim() });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Forward approval</DialogTitle>
+          <DialogDescription>
+            {approval.department} remains accountable — once the delegate decides, the request
+            returns here for final sign-off.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Forward to department
+            </Label>
+            <Select
+              value={dept}
+              onValueChange={(v) => {
+                setDept(v);
+                setUserId("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Specific approver (optional)
+            </Label>
+            <Select value={userId || "any"} onValueChange={(v) => setUserId(v === "any" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Anyone in the department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anyone in the department</SelectItem>
+                {filtered.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Reason for delegation <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Explain why this approval is being forwarded…"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy || !note.trim()}>
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Forward
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function TemplateBlock({
   data,

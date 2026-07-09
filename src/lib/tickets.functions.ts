@@ -376,8 +376,22 @@ export const updateAssignmentStatus = createServerFn({ method: "POST" })
         .single();
       if (row?.department !== dept) throw new Error("Not in your department.");
     }
+    // Block resolution while the ticket is waiting for an approval decision.
+    if (data.status === "Resolved") {
+      const { data: parentTicket } = await supabaseAdmin
+        .from("ticket_assignments")
+        .select("ticket_id, tickets:tickets!inner(approval_lock)")
+        .eq("id", data.assignment_id)
+        .single();
+      if ((parentTicket as any)?.tickets?.approval_lock) {
+        throw new Error(
+          "This ticket is waiting for approval and cannot be resolved yet. Complete the approval workflow first.",
+        );
+      }
+    }
     const patch: { status: typeof data.status; resolved_at?: string } = { status: data.status };
     if (data.status === "Resolved") patch.resolved_at = new Date().toISOString();
+
     const { data: updated, error } = await supabaseAdmin
       .from("ticket_assignments")
       .update(patch)

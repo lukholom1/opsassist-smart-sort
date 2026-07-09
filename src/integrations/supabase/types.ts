@@ -464,6 +464,7 @@ export type Database = {
       }
       tickets: {
         Row: {
+          approval_lock: boolean
           approval_required: boolean
           approval_status: string | null
           approved_at: string | null
@@ -490,6 +491,7 @@ export type Database = {
           workflow_stage: string
         }
         Insert: {
+          approval_lock?: boolean
           approval_required?: boolean
           approval_status?: string | null
           approved_at?: string | null
@@ -516,6 +518,7 @@ export type Database = {
           workflow_stage?: string
         }
         Update: {
+          approval_lock?: boolean
           approval_required?: boolean
           approval_status?: string | null
           approved_at?: string | null
@@ -567,53 +570,85 @@ export type Database = {
       workflow_approvals: {
         Row: {
           approver_user_id: string | null
+          assigned_user_id: string | null
+          awaiting_delegation: boolean
           created_at: string
           decided_at: string | null
           decided_by: string | null
           decided_by_name: string | null
           decision_note: string | null
+          delegated_from_id: string | null
+          delegated_to_id: string | null
           department: string | null
           id: string
+          origin_department: string | null
           request_note: string | null
           requested_by: string | null
           requested_by_name: string | null
+          sequence: number
           stage_id: string | null
           status: string
           ticket_id: string
         }
         Insert: {
           approver_user_id?: string | null
+          assigned_user_id?: string | null
+          awaiting_delegation?: boolean
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
           decided_by_name?: string | null
           decision_note?: string | null
+          delegated_from_id?: string | null
+          delegated_to_id?: string | null
           department?: string | null
           id?: string
+          origin_department?: string | null
           request_note?: string | null
           requested_by?: string | null
           requested_by_name?: string | null
+          sequence?: number
           stage_id?: string | null
           status?: string
           ticket_id: string
         }
         Update: {
           approver_user_id?: string | null
+          assigned_user_id?: string | null
+          awaiting_delegation?: boolean
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
           decided_by_name?: string | null
           decision_note?: string | null
+          delegated_from_id?: string | null
+          delegated_to_id?: string | null
           department?: string | null
           id?: string
+          origin_department?: string | null
           request_note?: string | null
           requested_by?: string | null
           requested_by_name?: string | null
+          sequence?: number
           stage_id?: string | null
           status?: string
           ticket_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workflow_approvals_delegated_from_id_fkey"
+            columns: ["delegated_from_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_approvals_delegated_to_id_fkey"
+            columns: ["delegated_to_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_approvals"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workflow_approvals_stage_id_fkey"
             columns: ["stage_id"]
@@ -775,6 +810,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      recalc_approval_lock: { Args: { _ticket_id: string }; Returns: undefined }
       user_department: { Args: { _uid: string }; Returns: string }
     }
     Enums: {

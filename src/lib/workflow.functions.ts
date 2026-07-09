@@ -41,7 +41,14 @@ export type WorkflowApproval = {
   request_note: string | null;
   requested_by: string | null;
   requested_by_name: string | null;
+  origin_department: string | null;
+  delegated_from_id: string | null;
+  delegated_to_id: string | null;
+  awaiting_delegation: boolean;
+  assigned_user_id: string | null;
+  sequence: number;
 };
+
 
 export type WorkflowHistoryRow = {
   id: string;
@@ -215,16 +222,24 @@ export const getTicketWorkflow = createServerFn({ method: "POST" })
   });
 
 // Pending approvals for the current admin (their department, or all for super admin).
+// Excludes parent rows that are currently awaiting a delegated child decision —
+// they'll return to actionable state automatically once the delegate decides.
+// Includes delegated child rows targeted at the admin's department or user id.
 export const listPendingApprovals = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
   .handler(async ({ context }) => {
     const dept = context.department as string | null;
+    const userId = context.userId as string;
     let q = supabaseAdmin
       .from("workflow_approvals")
       .select("*")
       .eq("status", "pending")
+      .eq("awaiting_delegation", false)
       .order("created_at", { ascending: true });
-    if (dept) q = q.eq("department", dept);
+    if (dept) {
+      // Department admin sees rows for their department OR delegated rows assigned to them personally.
+      q = q.or(`department.eq.${dept},assigned_user_id.eq.${userId}`);
+    }
     const { data: approvals } = await q;
     const rows = (approvals ?? []) as WorkflowApproval[];
     const ticketIds = Array.from(new Set(rows.map((r) => r.ticket_id)));
@@ -247,9 +262,11 @@ export const listPendingApprovals = createServerFn({ method: "GET" })
         ...a,
         ticket: ticketById.get(a.ticket_id) ?? null,
         stage: a.stage_id ? (stageById.get(a.stage_id) ?? null) : null,
+        is_delegated: !!a.delegated_from_id,
       })),
     };
   });
+
 
 const DecisionSchema = z
   .object({
@@ -396,6 +413,87 @@ export const decideApproval = createServerFn({ method: "POST" })
       return { ok: true };
     }
 
+    // === Delegated-child handling ===
+    // If this row is a delegated child, do NOT complete the parent's approval —
+    // return control to the parent department. The parent department must still
+    // click Approve/Reject themselves to keep them accountable.
+    if (approval.delegated_from_id) {
+      const parentId = approval.delegated_from_id;
+      if (data.decision === "approve") {
+        await supabaseAdmin
+          .from("workflow_approvals")
+          .update({ awaiting_delegation: false })
+          .eq("id", parentId);
+        await supabaseAdmin.from("workflow_history").insert({
+          ticket_id: approval.ticket_id,
+          stage_id: approval.stage_id,
+          action: "delegation_returned",
+          actor_id: context.userId,
+          actor_name: actorName,
+          actor_department: dept,
+          comment: `${approval.department ?? "Delegate"} approved — returned to ${approval.origin_department ?? "originating department"} for final approval.`,
+        });
+        // Notify the parent department admins that they need to finalise.
+        const { data: parent } = await supabaseAdmin
+          .from("workflow_approvals")
+          .select("department, ticket_id")
+          .eq("id", parentId)
+          .maybeSingle();
+        const parentDept = (parent as any)?.department as string | null;
+        if (parentDept) {
+          const { data: ticket } = await supabaseAdmin
+            .from("tickets")
+            .select("title")
+            .eq("id", approval.ticket_id)
+            .maybeSingle();
+          const title = (ticket as any)?.title ?? "Ticket";
+          const { data: admins } = await supabaseAdmin
+            .from("user_roles")
+            .select("user_id, profiles!inner(department, email, full_name)")
+            .in("role", ["admin", "manager"] as any);
+          const notifs: any[] = [];
+          for (const r of (admins ?? []) as any[]) {
+            if (r.profiles?.department === parentDept) {
+              notifs.push({
+                user_id: r.user_id,
+                ticket_id: approval.ticket_id,
+                type: "approval_required",
+                title: `Delegate approved (${approval.department}): ${title}`,
+                body: `${actorName} approved the delegated request. ${parentDept} must now provide the final department approval.`,
+                metadata: {
+                  ticket_id: approval.ticket_id,
+                  approval_id: parentId,
+                  delegated_from: approval.department,
+                },
+              });
+            }
+          }
+          if (notifs.length) await supabaseAdmin.from("notifications").insert(notifs);
+        }
+        return { ok: true };
+      }
+      // Reject on child → send back to parent as pending with the rejection note attached.
+      if (data.decision === "reject") {
+        await supabaseAdmin
+          .from("workflow_approvals")
+          .update({
+            awaiting_delegation: false,
+            request_note: `Delegate ${approval.department} rejected: ${data.comment ?? "(no reason)"}`,
+          })
+          .eq("id", parentId);
+        await supabaseAdmin.from("workflow_history").insert({
+          ticket_id: approval.ticket_id,
+          stage_id: approval.stage_id,
+          action: "delegation_rejected",
+          actor_id: context.userId,
+          actor_name: actorName,
+          actor_department: dept,
+          comment: `${approval.department ?? "Delegate"} rejected: ${data.comment ?? ""}`,
+        });
+        return { ok: true };
+      }
+    }
+
     if (data.decision === "reject") {
       await supabaseAdmin
         .from("ticket_workflow")
@@ -406,6 +504,7 @@ export const decideApproval = createServerFn({ method: "POST" })
 
     // Manual (stage-less) approval — no workflow to advance.
     if (!approval.stage_id) return { ok: true };
+
 
     // Approved — check if all approvals for this stage are approved, then advance.
     const { data: sibling } = await supabaseAdmin
@@ -586,12 +685,15 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
       ticket_id: data.ticket_id,
       stage_id: null,
       department: d,
+      origin_department: d,
       approver_user_id: null,
+      assigned_user_id: null,
       status: "pending" as const,
       request_note: data.note,
       requested_by: context.userId,
       requested_by_name: actorName,
     }));
+
     const { data: inserted, error } = await supabaseAdmin
       .from("workflow_approvals")
       .insert(rows as any)
@@ -800,4 +902,156 @@ export const listApproverCandidates = createServerFn({ method: "GET" })
         role: roleById.get(p.id) ?? "admin",
       })),
     };
+  });
+
+// ============================================================================
+// Delegated (forwarded) approvals
+// ============================================================================
+
+const ForwardSchema = z.object({
+  approval_id: z.string().uuid(),
+  to_department: z.string().trim().min(1).max(60),
+  to_user_id: z.string().uuid().optional().nullable(),
+  note: z.string().trim().min(1, "Please explain why you're forwarding this approval.").max(2000),
+});
+
+export const forwardApproval = createServerFn({ method: "POST" })
+  .middleware([requireRole(["admin"])])
+  .inputValidator((input: unknown) => ForwardSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const dept = context.department as string | null;
+    const actorName = (context.profile as any)?.full_name ?? "Admin";
+
+    const { data: parentRow } = await supabaseAdmin
+      .from("workflow_approvals")
+      .select("*")
+      .eq("id", data.approval_id)
+      .maybeSingle();
+    if (!parentRow) throw new Error("Approval not found.");
+    const parent = parentRow as WorkflowApproval;
+    if (parent.status !== "pending") throw new Error("This approval has already been decided.");
+    if (parent.awaiting_delegation) throw new Error("This approval is already awaiting a delegate.");
+    if (dept && parent.department && parent.department !== dept) {
+      throw new Error("You can only forward approvals in your department.");
+    }
+    if (parent.department === data.to_department && !data.to_user_id) {
+      throw new Error("Pick a different department (or an individual approver) to forward to.");
+    }
+
+    // Create the delegated child.
+    const { data: childRows, error: cErr } = await supabaseAdmin
+      .from("workflow_approvals")
+      .insert({
+        ticket_id: parent.ticket_id,
+        stage_id: parent.stage_id,
+        department: data.to_department,
+        origin_department: parent.origin_department ?? parent.department,
+        approver_user_id: null,
+        assigned_user_id: data.to_user_id ?? null,
+        status: "pending",
+        request_note:
+          `Forwarded from ${parent.department ?? "originating department"} by ${actorName}: ${data.note}`,
+        requested_by: context.userId,
+        requested_by_name: actorName,
+        delegated_from_id: parent.id,
+      } as any)
+      .select("id")
+      .single();
+    if (cErr || !childRows) throw new Error(cErr?.message ?? "Failed to forward");
+
+    await supabaseAdmin
+      .from("workflow_approvals")
+      .update({ delegated_to_id: (childRows as any).id, awaiting_delegation: true })
+      .eq("id", parent.id);
+
+    await supabaseAdmin.from("workflow_history").insert({
+      ticket_id: parent.ticket_id,
+      stage_id: parent.stage_id,
+      action: "approval_delegated",
+      actor_id: context.userId,
+      actor_name: actorName,
+      actor_department: dept,
+      comment: `${parent.department ?? "Approver"} delegated to ${data.to_department}${
+        data.to_user_id ? " (specific user)" : ""
+      }: ${data.note}`,
+    });
+
+    // Notify the delegates (specific user OR everyone in the target department).
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("title")
+      .eq("id", parent.ticket_id)
+      .maybeSingle();
+    const title = (ticket as any)?.title ?? "Ticket";
+
+    const emailTargets: { email: string; name: string | null }[] = [];
+    const notifs: any[] = [];
+    if (data.to_user_id) {
+      const { data: prof } = await supabaseAdmin
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", data.to_user_id)
+        .maybeSingle();
+      notifs.push({
+        user_id: data.to_user_id,
+        ticket_id: parent.ticket_id,
+        type: "approval_required",
+        title: `Approval delegated to you: ${title}`,
+        body: data.note,
+        metadata: {
+          ticket_id: parent.ticket_id,
+          approval_id: (childRows as any).id,
+          delegated_from: parent.department,
+        },
+      });
+      if ((prof as any)?.email) {
+        emailTargets.push({
+          email: (prof as any).email,
+          name: (prof as any).full_name ?? null,
+        });
+      }
+    } else {
+      const { data: admins } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id, profiles!inner(department, email, full_name)")
+        .in("role", ["admin", "manager"] as any);
+      for (const r of (admins ?? []) as any[]) {
+        if (r.profiles?.department === data.to_department) {
+          notifs.push({
+            user_id: r.user_id,
+            ticket_id: parent.ticket_id,
+            type: "approval_required",
+            title: `Approval delegated (${data.to_department}): ${title}`,
+            body: data.note,
+            metadata: {
+              ticket_id: parent.ticket_id,
+              approval_id: (childRows as any).id,
+              delegated_from: parent.department,
+            },
+          });
+          if (r.profiles?.email) {
+            emailTargets.push({
+              email: r.profiles.email,
+              name: r.profiles.full_name ?? null,
+            });
+          }
+        }
+      }
+    }
+    if (notifs.length) await supabaseAdmin.from("notifications").insert(notifs);
+    await Promise.all(
+      emailTargets.map((t) =>
+        sendNotificationEmail({
+          to: t.email,
+          subject: `Approval delegated (${data.to_department}): ${title}`,
+          heading: "You've been asked to review an approval",
+          intro: `${actorName}${parent.department ? ` (${parent.department})` : ""} has delegated an approval to ${data.to_department}. Please review in OpsAssist.`,
+          ticketTitle: title,
+          body: data.note,
+          accent: "warning",
+        }).catch(() => ({ sent: false })),
+      ),
+    );
+
+    return { ok: true, child_id: (childRows as any).id };
   });

@@ -74,12 +74,14 @@ type Ticket = {
   resolved_at: string | null;
   resolved_by_ai: boolean;
   resolution_source: string | null;
+  approval_lock: boolean;
   assignments: AssignmentRow[];
   my_assignment: AssignmentRow | null;
   feedback: { rating: number; comment: string | null } | null;
   last_note_at: string | null;
   last_note_role: "user" | "admin" | null;
 };
+
 
 function AdminTicketsPage() {
   const navigate = useNavigate();
@@ -484,7 +486,7 @@ function TicketTable({
                         <Select
                           value={a.status}
                           onValueChange={(v) => onStatus(a.id, v as Status)}
-                          disabled={!!myDept && a.department !== myDept}
+                          disabled={(!!myDept && a.department !== myDept) || t.approval_lock}
                         >
                           <SelectTrigger className="h-8 w-[130px] rounded-full text-xs">
                             <SelectValue />
@@ -496,7 +498,9 @@ function TicketTable({
                                 In Progress (auto)
                               </SelectItem>
                             )}
-                            <SelectItem value="Resolved">Resolved</SelectItem>
+                            <SelectItem value="Resolved" disabled={t.approval_lock}>
+                              Resolved
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         {saving === a.id && (
@@ -504,8 +508,17 @@ function TicketTable({
                         )}
                       </div>
                     ))}
+                    {t.approval_lock && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-warning ring-1 ring-inset ring-warning/30"
+                        title="Waiting for approval — resolution is disabled until the approval workflow completes."
+                      >
+                        Awaiting approval
+                      </span>
+                    )}
                   </div>
                 </td>
+
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {elapsed(t.created_at, t.resolved_at)}
                 </td>

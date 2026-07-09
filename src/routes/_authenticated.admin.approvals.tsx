@@ -2,13 +2,33 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { listPendingApprovals, decideApproval } from "@/lib/workflow.functions";
+import {
+  listPendingApprovals,
+  decideApproval,
+  forwardApproval,
+  listApproverCandidates,
+} from "@/lib/workflow.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -18,7 +38,13 @@ import {
   Building2,
   Loader2,
   Inbox,
+  Forward,
+  ExternalLink,
+  GitBranch,
 } from "lucide-react";
+
+const DEPARTMENTS = ["HR", "IT", "Finance", "Operations"] as const;
+
 
 export const Route = createFileRoute("/_authenticated/admin/approvals")({
   head: () => ({ meta: [{ title: "Approvals — OpsAssist" }] }),
@@ -35,10 +61,24 @@ function ApprovalsPage() {
   const navigate = useNavigate();
   const listFn = useServerFn(listPendingApprovals);
   const decideFn = useServerFn(decideApproval);
+  const forwardFn = useServerFn(forwardApproval);
+  const listCandidatesFn = useServerFn(listApproverCandidates);
   const [items, setItems] = useState<ApprovalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
+  const [forwardTarget, setForwardTarget] = useState<ApprovalItem | null>(null);
+  const [candidates, setCandidates] = useState<
+    { id: string; name: string; department: string | null }[]
+  >([]);
+
+  useEffect(() => {
+    listCandidatesFn()
+      .then((r: any) => setCandidates(r.users ?? []))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   useEffect(() => {
     if (role && role !== "admin") navigate({ to: "/dashboard", replace: true });
@@ -179,11 +219,28 @@ function ApprovalsPage() {
                         <Badge variant="outline" className="gap-1">
                           <Building2 size={11} /> {a.department ?? "—"}
                         </Badge>
+                        {(a as any).origin_department &&
+                          (a as any).origin_department !== a.department && (
+                            <Badge variant="outline" className="gap-1 border-primary/40 text-primary">
+                              <GitBranch size={11} /> from {(a as any).origin_department}
+                            </Badge>
+                          )}
+                        {(a as any).is_delegated && (
+                          <Badge className="gap-1 bg-primary/15 text-primary border border-primary/30">
+                            <Forward size={11} /> Delegated
+                          </Badge>
+                        )}
+                        {Array.isArray(t?.categories) && t.categories[0] && (
+                          <Badge variant="outline" className="gap-1">
+                            Owner: {t.categories[0]}
+                          </Badge>
+                        )}
                         <Badge variant="outline">Priority: {t?.priority ?? "—"}</Badge>
                         <Badge className="gap-1 bg-warning/15 text-warning border border-warning/30">
-                          <Clock size={11} /> {a.stage?.name ?? "Stage"}
+                          <Clock size={11} /> {a.stage?.name ?? "Pending your review"}
                         </Badge>
                       </div>
+
                     </div>
                   </CardHeader>
                   <CardContent className="grid gap-4">
@@ -258,6 +315,21 @@ function ApprovalsPage() {
                       >
                         <MessageCircleQuestion size={14} className="mr-1.5" /> Request info
                       </Button>
+                      <Button
+                        onClick={() => setForwardTarget(a)}
+                        disabled={busyId === a.id}
+                        variant="outline"
+                      >
+                        <Forward size={14} className="mr-1.5" /> Forward
+                      </Button>
+                      <Button asChild variant="ghost" size="sm" className="ml-auto">
+                        <Link
+                          to="/admin/tickets"
+                          search={{ ticket: a.ticket_id }}
+                        >
+                          <ExternalLink size={14} className="mr-1.5" /> View ticket
+                        </Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -266,6 +338,142 @@ function ApprovalsPage() {
           </div>
         )}
       </main>
+
+      {forwardTarget && (
+        <ForwardDialog
+          approval={forwardTarget}
+          candidates={candidates}
+          onClose={() => setForwardTarget(null)}
+          onSubmit={async ({ to_department, to_user_id, note }) => {
+            setBusyId(forwardTarget.id);
+            try {
+              await forwardFn({
+                data: {
+                  approval_id: forwardTarget.id,
+                  to_department,
+                  to_user_id: to_user_id || undefined,
+                  note,
+                },
+              });
+              toast.success("Approval forwarded — delegate has been notified.");
+              setForwardTarget(null);
+              await refresh();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Failed to forward");
+            } finally {
+              setBusyId(null);
+            }
+          }}
+        />
+      )}
     </div>
+  );
+
+}
+
+function ForwardDialog({
+  approval,
+  candidates,
+  onClose,
+  onSubmit,
+}: {
+  approval: ApprovalItem;
+  candidates: { id: string; name: string; department: string | null }[];
+  onClose: () => void;
+  onSubmit: (v: { to_department: string; to_user_id: string; note: string }) => void | Promise<void>;
+}) {
+  const [dept, setDept] = useState<string>(
+    DEPARTMENTS.find((d) => d !== approval.department) ?? "Finance",
+  );
+  const [userId, setUserId] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const filtered = candidates.filter((c) => c.department === dept);
+
+  async function submit() {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      await onSubmit({ to_department: dept, to_user_id: userId, note: note.trim() });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Forward this approval</DialogTitle>
+          <DialogDescription>
+            You remain accountable for the {approval.department} approval. Once the delegate
+            decides, the request returns to you for final sign-off.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Forward to department
+            </label>
+            <Select
+              value={dept}
+              onValueChange={(v) => {
+                setDept(v);
+                setUserId("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Specific approver (optional)
+            </label>
+            <Select value={userId || "any"} onValueChange={(v) => setUserId(v === "any" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Anyone in the department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anyone in the department</SelectItem>
+                {filtered.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Reason for delegation <span className="text-destructive">*</span>
+            </label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Explain why this approval is being forwarded…"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy || !note.trim()}>
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Forward
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
