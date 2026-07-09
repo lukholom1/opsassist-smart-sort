@@ -149,6 +149,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
     let confidenceCount = 0;
     let rejectedAiCount = 0;
     const rejectedByCategory = new Map<string, number>();
+    let languageFlags = 0;
 
     for (const t of tickets) {
       const cats = (t.categories?.length ? t.categories : [t.category]) as string[];
