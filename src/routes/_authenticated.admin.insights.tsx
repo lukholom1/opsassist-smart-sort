@@ -220,8 +220,10 @@ function InsightsPage() {
               size="sm"
               onClick={() => navigate({ to: "/admin" })}
               className="rounded-lg"
+              aria-label="Back"
             >
-              <ArrowLeft size={14} className="mr-1.5" /> Back
+              <ArrowLeft size={14} className="sm:mr-1.5" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
             <Button
               variant="outline"
@@ -229,25 +231,28 @@ function InsightsPage() {
               onClick={() => loadAll(currentRange())}
               disabled={loadingAnalytics || loadingReport}
               className="rounded-lg"
+              aria-label="Refresh"
             >
               <RefreshCw
                 size={14}
-                className={`mr-1.5 ${loadingAnalytics || loadingReport ? "animate-spin" : ""}`}
+                className={`sm:mr-1.5 ${loadingAnalytics || loadingReport ? "animate-spin" : ""}`}
               />
-              Refresh
+              <span className="hidden sm:inline">Refresh</span>
             </Button>
             <Button
               size="sm"
               onClick={handleDownload}
               disabled={!report || downloading}
               className="rounded-lg"
+              aria-label="Download PDF"
             >
               {downloading ? (
-                <Loader2 size={14} className="mr-1.5 animate-spin" />
+                <Loader2 size={14} className="sm:mr-1.5 animate-spin" />
               ) : (
-                <Download size={14} className="mr-1.5" />
+                <Download size={14} className="sm:mr-1.5" />
               )}
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
         </div>
