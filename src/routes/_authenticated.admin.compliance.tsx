@@ -89,7 +89,8 @@ function CompliancePage() {
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link to="/admin">
-                <ArrowLeft size={14} className="mr-1.5" /> Back
+                <ArrowLeft size={14} className="sm:mr-1.5" />
+                <span className="hidden sm:inline">Back</span>
               </Link>
             </Button>
             <Button
@@ -97,8 +98,11 @@ function CompliancePage() {
               onClick={downloadReport}
               disabled={!data}
               className="rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
+              aria-label="Generate Compliance Report"
             >
-              <Download size={14} className="mr-1.5" /> Generate Compliance Report
+              <Download size={14} className="sm:mr-1.5" />
+              <span className="hidden sm:inline">Generate Compliance Report</span>
+              <span className="sm:hidden">Report</span>
             </Button>
           </div>
         </div>
