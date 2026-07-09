@@ -8,6 +8,10 @@ import {
   type TicketNote,
 } from "@/lib/tickets.functions";
 import {
+  getTicketApprovalState,
+  respondToApprovalInfoRequest,
+} from "@/lib/workflow.functions";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,7 +20,17 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Bot, Loader2, Lock, MessageSquare, Send, Sparkles, Users } from "lucide-react";
+import {
+  Bot,
+  HelpCircle,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Users,
+} from "lucide-react";
+
 
 function relTime(iso: string) {
   const d = new Date(iso);
@@ -45,6 +59,8 @@ export function ChatbotDialog({
   const listFn = useServerFn(listTicketNotes);
   const addNoteFn = useServerFn(addTicketNote);
   const askBotFn = useServerFn(askTicketBot);
+  const approvalStateFn = useServerFn(getTicketApprovalState);
+  const respondInfoFn = useServerFn(respondToApprovalInfoRequest);
 
   const deptAdmins = (() => {
     const seen = new Set<string>();
@@ -67,6 +83,12 @@ export function ChatbotDialog({
   const [aiThinking, setAiThinking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [escalated, setEscalated] = useState(false);
+  const [infoApprovals, setInfoApprovals] = useState<
+    { id: string; department: string | null; decision_note: string | null; decided_by_name: string | null }[]
+  >([]);
+  const [infoReplies, setInfoReplies] = useState<Record<string, string>>({});
+  const [infoBusyId, setInfoBusyId] = useState<string | null>(null);
+  const [infoErr, setInfoErr] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
   const selectedAdmin = deptAdmins.find((d) => d.department === selectedDept) ?? deptAdmins[0];
@@ -76,9 +98,26 @@ export function ChatbotDialog({
 
   async function refresh() {
     try {
-      const r = await listFn({ data: { ticket_id: ticketId } });
+      const [r, s] = await Promise.all([
+        listFn({ data: { ticket_id: ticketId } }),
+        approvalStateFn({ data: { ticket_id: ticketId } }).catch(() => null),
+      ]);
       setNotes(r.notes);
       setLocked(r.locked);
+      if (s && Array.isArray((s as any).approvals)) {
+        setInfoApprovals(
+          ((s as any).approvals as any[])
+            .filter((a) => a.status === "info_requested")
+            .map((a) => ({
+              id: a.id,
+              department: a.department ?? null,
+              decision_note: a.decision_note ?? null,
+              decided_by_name: a.decided_by_name ?? null,
+            })),
+        );
+      } else {
+        setInfoApprovals([]);
+      }
     } finally {
       setLoading(false);
       queueMicrotask(() => {
@@ -93,6 +132,23 @@ export function ChatbotDialog({
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
+
+  async function submitInfo(approvalId: string) {
+    const message = (infoReplies[approvalId] ?? "").trim();
+    if (!message || infoBusyId) return;
+    setInfoBusyId(approvalId);
+    setInfoErr(null);
+    try {
+      await respondInfoFn({ data: { approval_id: approvalId, message } });
+      setInfoReplies((r) => ({ ...r, [approvalId]: "" }));
+      await refresh();
+    } catch (e) {
+      setInfoErr(e instanceof Error ? e.message : "Failed to send response.");
+    } finally {
+      setInfoBusyId(null);
+    }
+  }
+
 
   async function send() {
     if (!body.trim() || sending || locked) return;
@@ -160,6 +216,52 @@ export function ChatbotDialog({
             <Users size={12} className="mr-1 inline" /> Message Admin
           </button>
         </div>
+
+        {infoApprovals.length > 0 && !locked && (
+          <div className="space-y-3 rounded-xl border border-warning/40 bg-warning/10 p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-warning">
+              <HelpCircle size={14} /> More information requested
+            </div>
+            {infoApprovals.map((a) => (
+              <div key={a.id} className="space-y-2 rounded-lg bg-background/60 p-3 ring-1 ring-warning/20">
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {a.decided_by_name ?? "An admin"}
+                  {a.department ? ` · ${a.department}` : ""} asked:
+                </div>
+                <p className="whitespace-pre-wrap text-sm text-foreground">
+                  {a.decision_note?.trim() || "Please provide additional information for this approval."}
+                </p>
+                <Textarea
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Share the requested details…"
+                  value={infoReplies[a.id] ?? ""}
+                  onChange={(e) =>
+                    setInfoReplies((r) => ({ ...r, [a.id]: e.target.value }))
+                  }
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    disabled={infoBusyId === a.id || !(infoReplies[a.id] ?? "").trim()}
+                    onClick={() => submitInfo(a.id)}
+                    className="rounded-full"
+                  >
+                    {infoBusyId === a.id ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Send size={12} className="mr-1.5" />
+                    )}
+                    Send response
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {infoErr && <p className="text-xs text-destructive">{infoErr}</p>}
+          </div>
+        )}
+
+
 
         <div
           ref={scrollerRef}

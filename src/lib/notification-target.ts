@@ -47,6 +47,8 @@ export function getNotificationTarget(
     case "approval_approved":
     case "approval_rejected":
     case "approval_info_requested":
+    case "approval_info_provided":
+
     case "approval_granted":
     case "approval_denied":
     case "new_note":

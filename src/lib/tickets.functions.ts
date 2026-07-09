@@ -820,6 +820,24 @@ export const askTicketBot = createServerFn({ method: "POST" })
       .maybeSingle();
     const userName = profile?.full_name ?? "User";
 
+    // Content moderation on the user's chatbot message.
+    const { detectStrongLanguage, STRONG_LANGUAGE_ADVISORY } = await import("./moderation");
+    const mod = detectStrongLanguage(data.message);
+    if (mod.flagged) {
+      await supabaseAdmin.from("ticket_activity").insert({
+        ticket_id: data.ticket_id,
+        actor_id: context.userId,
+        actor_name: userName,
+        actor_role: "user",
+        event_type: "strong_language_blocked",
+        description: "Blocked user message to AI chatbot for strong language",
+        metadata: { matches: mod.matches.slice(0, 8), channel: "chatbot" },
+      });
+      throw new Error(
+        `${STRONG_LANGUAGE_ADVISORY} Your message wasn't sent — please rephrase and try again.`,
+      );
+    }
+
     await supabaseAdmin.from("ticket_notes").insert({
       ticket_id: data.ticket_id,
       author_id: context.userId,
@@ -827,6 +845,7 @@ export const askTicketBot = createServerFn({ method: "POST" })
       author_role: "user",
       body: data.message,
     });
+
 
     const [{ data: notes }, { data: assignments }] = await Promise.all([
       supabaseAdmin
@@ -1017,6 +1036,26 @@ export const addTicketNote = createServerFn({ method: "POST" })
     if (ticket.status === "Resolved") {
       throw new Error("This ticket is resolved — the conversation is closed.");
     }
+    // Content moderation: block strong language for both users AND admins,
+    // and log the attempt to ticket_activity so it shows up in compliance.
+    const { detectStrongLanguage } = await import("./moderation");
+    const mod = detectStrongLanguage(data.body);
+    if (mod.flagged) {
+      await supabaseAdmin.from("ticket_activity").insert({
+        ticket_id: data.ticket_id,
+        actor_id: context.userId,
+        actor_name: name,
+        actor_role: role,
+        event_type: "strong_language_blocked",
+        description: `Blocked ${role === "admin" ? "admin" : "user"} message for strong language`,
+        metadata: { matches: mod.matches.slice(0, 8), channel: "note" },
+      });
+      throw new Error(
+        role === "admin"
+          ? "Message not sent — please keep communication respectful and professional. Rephrase without strong or offensive language."
+          : "Message not sent — please keep messages respectful. Rephrase without strong or offensive language and try again.",
+      );
+    }
     const { data: row, error } = await supabaseAdmin
       .from("ticket_notes")
       .insert({
@@ -1050,6 +1089,7 @@ export const addTicketNote = createServerFn({ method: "POST" })
     }
     return { note: row as TicketNote };
   });
+
 
 // Queue a 2-minute delayed follow-up email to the ticket requester.
 // If the user replies before the window expires, the row is cancelled

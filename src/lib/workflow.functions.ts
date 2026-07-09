@@ -1055,3 +1055,127 @@ export const forwardApproval = createServerFn({ method: "POST" })
 
     return { ok: true, child_id: (childRows as any).id };
   });
+
+// ============================================================================
+// Requester provides more info on an approval currently in `info_requested`.
+// ============================================================================
+
+const RespondInfoSchema = z.object({
+  approval_id: z.string().uuid(),
+  message: z.string().trim().min(1, "Please add a message.").max(2000),
+});
+
+export const respondToApprovalInfoRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => RespondInfoSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: appr } = await supabaseAdmin
+      .from("workflow_approvals")
+      .select("*")
+      .eq("id", data.approval_id)
+      .maybeSingle();
+    if (!appr) throw new Error("Approval not found.");
+    const approval = appr as WorkflowApproval;
+    if (approval.status !== "info_requested") {
+      throw new Error("This approval is no longer waiting on you.");
+    }
+
+    // Only the ticket owner (requester) may respond.
+    const { data: ticket } = await supabaseAdmin
+      .from("tickets")
+      .select("id, user_id, title")
+      .eq("id", approval.ticket_id)
+      .maybeSingle();
+    if (!ticket) throw new Error("Ticket not found.");
+    if ((ticket as any).user_id !== context.userId) {
+      throw new Error("You can't respond to this approval.");
+    }
+
+    // Content moderation.
+    const { detectStrongLanguage, STRONG_LANGUAGE_ADVISORY } = await import("./moderation");
+    const mod = detectStrongLanguage(data.message);
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name")
+      .eq("id", context.userId)
+      .maybeSingle();
+    const userName = (profile as any)?.full_name ?? "User";
+    if (mod.flagged) {
+      await supabaseAdmin.from("ticket_activity").insert({
+        ticket_id: approval.ticket_id,
+        actor_id: context.userId,
+        actor_name: userName,
+        actor_role: "user",
+        event_type: "strong_language_blocked",
+        description: "Blocked user response to approval info request for strong language",
+        metadata: { matches: mod.matches.slice(0, 8), channel: "approval_info" },
+      });
+      throw new Error(
+        `${STRONG_LANGUAGE_ADVISORY} Your response wasn't sent — please rephrase and try again.`,
+      );
+    }
+
+    // Return the approval to pending, attach the requester's response as request_note.
+    const prevNote = approval.request_note ? `${approval.request_note}\n\n---\n` : "";
+    await supabaseAdmin
+      .from("workflow_approvals")
+      .update({
+        status: "pending",
+        request_note: `${prevNote}Requester response (${userName}): ${data.message}`,
+        decision_note: null,
+        decided_by: null,
+        decided_by_name: null,
+        decided_at: null,
+      })
+      .eq("id", data.approval_id);
+
+    // Timeline entry.
+    await supabaseAdmin.from("workflow_history").insert({
+      ticket_id: approval.ticket_id,
+      stage_id: approval.stage_id,
+      action: "info_provided",
+      actor_id: context.userId,
+      actor_name: userName,
+      actor_department: null,
+      comment: data.message,
+    });
+
+    // Post as a ticket note so it's visible in the chat / notes UI too.
+    await supabaseAdmin.from("ticket_notes").insert({
+      ticket_id: approval.ticket_id,
+      author_id: context.userId,
+      author_name: userName,
+      author_role: "user",
+      body: `[Approval response · ${approval.department ?? "approval"}] ${data.message}`,
+    });
+
+    // Notify the admin who requested the info (falls back to department admins).
+    const notifyIds = new Set<string>();
+    if (approval.decided_by) notifyIds.add(approval.decided_by);
+    if (approval.requested_by) notifyIds.add(approval.requested_by);
+    if (notifyIds.size === 0 && approval.department) {
+      const { data: admins } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id, profiles!inner(department)")
+        .eq("role", "admin");
+      for (const a of (admins ?? []) as any[]) {
+        if (a.profiles?.department === approval.department) notifyIds.add(a.user_id);
+      }
+    }
+    const title = (ticket as any)?.title ?? "Ticket";
+    if (notifyIds.size) {
+      await supabaseAdmin.from("notifications").insert(
+        Array.from(notifyIds).map((uid) => ({
+          user_id: uid,
+          ticket_id: approval.ticket_id,
+          type: "approval_info_provided",
+          title: `Info provided: ${title}`,
+          body: data.message.slice(0, 200),
+          metadata: { approval_id: approval.id, department: approval.department },
+        })),
+      );
+    }
+
+    return { ok: true };
+  });
+

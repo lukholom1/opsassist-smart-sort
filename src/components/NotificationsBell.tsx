@@ -25,6 +25,8 @@ const APPROVAL_TYPES = new Set([
   "approval_granted",
   "approval_denied",
   "approval_info_requested",
+  "approval_info_provided",
+
 ]);
 
 export function NotificationsBell() {

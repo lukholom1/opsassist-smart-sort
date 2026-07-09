@@ -103,7 +103,8 @@ function priorityWeight(p: string): number {
 export const getComplianceReport = createServerFn({ method: "GET" })
   .middleware([requireRole(["admin"])])
   .handler(async (): Promise<ComplianceReport> => {
-    const [ticketsRes, notesRes, assignRes, feedbackRes] = await Promise.all([
+    const [ticketsRes, notesRes, assignRes, feedbackRes, allNotesRes, activityRes] =
+      await Promise.all([
       supabaseAdmin
         .from("tickets")
         .select(
@@ -121,6 +122,18 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         .from("ticket_assignments")
         .select("ticket_id, department, status, resolved_by_ai"),
       supabaseAdmin.from("ticket_feedback").select("ticket_id, rating, comment, resolution_source"),
+      supabaseAdmin
+        .from("ticket_notes")
+        .select("id, ticket_id, author_role, author_name, body, created_at")
+        .in("author_role", ["user", "admin"])
+        .order("created_at", { ascending: false })
+        .limit(4000),
+      supabaseAdmin
+        .from("ticket_activity")
+        .select("id, ticket_id, actor_name, actor_role, event_type, description, metadata, created_at")
+        .eq("event_type", "strong_language_blocked")
+        .order("created_at", { ascending: false })
+        .limit(2000),
     ]);
 
     if (ticketsRes.error) throw new Error(ticketsRes.error.message);
@@ -128,6 +141,9 @@ export const getComplianceReport = createServerFn({ method: "GET" })
     const aiNotes = notesRes.data ?? [];
     const assignments = assignRes.data ?? [];
     const feedback = feedbackRes.data ?? [];
+    const convNotes = allNotesRes.data ?? [];
+    const modActivity = activityRes.data ?? [];
+
 
     const feedbackByTicket = new Map(feedback.map((f) => [f.ticket_id, f]));
     const aiNoteByTicket = new Map<string, (typeof aiNotes)[number]>();
@@ -305,7 +321,48 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       }
     }
 
+    // Blocked chat/notes messages caught by moderation.
+    const ticketTitleById = new Map(tickets.map((t: any) => [t.id, t.title as string]));
+    for (const ev of modActivity as any[]) {
+      languageFlags += 1;
+      const matches = Array.isArray(ev.metadata?.matches) ? ev.metadata.matches : [];
+      const channel = ev.metadata?.channel ?? "note";
+      decisions.push({
+        id: `${ev.id}-mod-msg`,
+        ts: ev.created_at,
+        ticketId: ev.ticket_id,
+        ticketShort: (ev.ticket_id ?? "").slice(0, 8),
+        ticketTitle: ticketTitleById.get(ev.ticket_id) ?? "Ticket",
+        action: "Content moderation",
+        detail: `Blocked ${ev.actor_role ?? "message"} on ${channel}${matches.length ? ` (${matches.slice(0, 3).join(", ")})` : ""}.`,
+        confidence: 0.95,
+      });
+    }
+
+    // Extra sweep: strong language actually posted in notes (belt-and-braces for
+    // messages older than moderation, or admin-side compliance oversight).
+    const seenNoteFlags = new Set<string>();
+    for (const n of convNotes as any[]) {
+      const m = detectStrongLanguage(n.body ?? "");
+      if (!m.flagged) continue;
+      languageFlags += 1;
+      const key = `${n.id}-note-mod`;
+      if (seenNoteFlags.has(key)) continue;
+      seenNoteFlags.add(key);
+      decisions.push({
+        id: key,
+        ts: n.created_at,
+        ticketId: n.ticket_id,
+        ticketShort: (n.ticket_id ?? "").slice(0, 8),
+        ticketTitle: ticketTitleById.get(n.ticket_id) ?? "Ticket",
+        action: "Content moderation",
+        detail: `Strong language detected in ${n.author_role} message (${m.matches.slice(0, 3).join(", ")}).`,
+        confidence: 0.9,
+      });
+    }
+
     decisions.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+
 
     // include prediction action (one synthetic per active day) — sourced from
     // actual ticket activity to stay non-hardcoded.
