@@ -345,6 +345,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         : 0,
       avgRating,
       rejectedAiCount,
+      languageFlags,
     };
 
     const topRejectedCategories = [...rejectedByCategory.entries()]
