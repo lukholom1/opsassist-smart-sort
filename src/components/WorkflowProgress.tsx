@@ -598,9 +598,148 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
           </div>
         </div>
       )}
+
+      {forwardId && (
+        <InlineForwardDialog
+          approval={approvals.find((a) => a.id === forwardId)!}
+          candidates={candidates}
+          onClose={() => setForwardId(null)}
+          onSubmit={async ({ to_department, to_user_id, note }) => {
+            setBusy(true);
+            try {
+              await forwardFn({
+                data: {
+                  approval_id: forwardId,
+                  to_department,
+                  to_user_id: to_user_id || undefined,
+                  note,
+                },
+              });
+              toast.success("Forwarded — the delegate has been notified.");
+              setForwardId(null);
+              await load();
+            } catch (e: any) {
+              toast.error(e?.message ?? "Failed to forward");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
+
+function InlineForwardDialog({
+  approval,
+  candidates,
+  onClose,
+  onSubmit,
+}: {
+  approval: WorkflowApproval;
+  candidates: { id: string; name: string; department: string | null }[];
+  onClose: () => void;
+  onSubmit: (v: {
+    to_department: string;
+    to_user_id: string;
+    note: string;
+  }) => void | Promise<void>;
+}) {
+  const [dept, setDept] = useState<string>(
+    DEPARTMENTS.find((d) => d !== approval.department) ?? "Finance",
+  );
+  const [userId, setUserId] = useState<string>("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const filtered = candidates.filter((c) => c.department === dept);
+
+  async function submit() {
+    if (!note.trim()) return;
+    setBusy(true);
+    try {
+      await onSubmit({ to_department: dept, to_user_id: userId, note: note.trim() });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Forward approval</DialogTitle>
+          <DialogDescription>
+            {approval.department} remains accountable — once the delegate decides, the request
+            returns here for final sign-off.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Forward to department
+            </Label>
+            <Select
+              value={dept}
+              onValueChange={(v) => {
+                setDept(v);
+                setUserId("");
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Specific approver (optional)
+            </Label>
+            <Select value={userId || "any"} onValueChange={(v) => setUserId(v === "any" ? "" : v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Anyone in the department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anyone in the department</SelectItem>
+                {filtered.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Reason for delegation <span className="text-destructive">*</span>
+            </Label>
+            <Textarea
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Explain why this approval is being forwarded…"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy || !note.trim()}>
+            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+            Forward
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function TemplateBlock({
   data,
