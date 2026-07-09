@@ -5,6 +5,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireRole } from "./auth-helpers.server";
+import { detectStrongLanguage } from "./moderation";
 
 type RiskLevel = "Low" | "Medium" | "High";
 
@@ -13,7 +14,8 @@ export type DecisionAction =
   | "Solution recommendation"
   | "Escalation"
   | "Resolution"
-  | "Prediction";
+  | "Prediction"
+  | "Content moderation";
 
 export type DecisionEntry = {
   id: string;
@@ -61,6 +63,7 @@ export type ComplianceReport = {
     avgConfidence: number;
     avgRating: number | null;
     rejectedAiCount: number;
+    languageFlags: number;
   };
   decisions: DecisionEntry[];
   transparency: TransparencyRow[];
@@ -104,7 +107,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       supabaseAdmin
         .from("tickets")
         .select(
-          "id, title, created_at, status, priority, category, categories, resolved_at, resolved_by_ai, resolution_source",
+          "id, title, details, created_at, status, priority, category, categories, resolved_at, resolved_by_ai, resolution_source",
         )
         .order("created_at", { ascending: false })
         .limit(2000),
@@ -146,6 +149,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
     let confidenceCount = 0;
     let rejectedAiCount = 0;
     const rejectedByCategory = new Map<string, number>();
+    let languageFlags = 0;
 
     for (const t of tickets) {
       const cats = (t.categories?.length ? t.categories : [t.category]) as string[];
@@ -155,6 +159,22 @@ export const getComplianceReport = createServerFn({ method: "GET" })
       const aiInvolved = !!aiNote || t.resolved_by_ai || t.resolution_source === "ai";
       const solConf = aiNote ? solutionConfidence(aiNote.body, fb?.rating ?? null) : null;
       const ticketShort = t.id.slice(0, 8);
+      const moderation = detectStrongLanguage(`${t.title ?? ""}\n${t.details ?? ""}`);
+      if (moderation.flagged) {
+        languageFlags += 1;
+        decisions.push({
+          id: `${t.id}-mod`,
+          ts: t.created_at,
+          ticketId: t.id,
+          ticketShort,
+          ticketTitle: t.title,
+          action: "Content moderation",
+          detail: `Strong language detected (${moderation.matches.slice(0, 3).join(", ")}${moderation.matches.length > 3 ? "…" : ""}). Advisory added to AI response.`,
+          confidence: 0.95,
+        });
+      }
+
+
 
       // decision log entries
       decisions.push({
@@ -258,12 +278,17 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         reasons.push("High-priority ticket with limited confidence");
       if (aiInvolved && t.status !== "Resolved" && !fb)
         reasons.push("AI recommendation pending human verification");
+      if (moderation.flagged)
+        reasons.push(
+          `Strong language flagged by content moderation (${moderation.matches.slice(0, 3).join(", ")})`,
+        );
 
       if (reasons.length) {
         const score =
           (effConf < 0.5 ? 2 : effConf < 0.7 ? 1 : 0) +
           (cats.length >= 3 ? 1 : 0) +
           (rejected ? 1 : 0) +
+          (moderation.flagged ? 2 : 0) +
           (t.priority === "High" ? priorityWeight(t.priority) - 1 : 0);
         const level: RiskLevel = score >= 3 ? "High" : score >= 1 ? "Medium" : "Low";
         risks.push({
@@ -320,6 +345,7 @@ export const getComplianceReport = createServerFn({ method: "GET" })
         : 0,
       avgRating,
       rejectedAiCount,
+      languageFlags,
     };
 
     const topRejectedCategories = [...rejectedByCategory.entries()]
@@ -349,6 +375,10 @@ export const getComplianceReport = createServerFn({ method: "GET" })
     if (avgRating != null && avgRating < 3.5)
       recommendations.push(
         `User satisfaction is averaging ${avgRating}/5. Audit recent resolutions and follow up with affected users.`,
+      );
+    if (totals.languageFlags > 0)
+      recommendations.push(
+        `${totals.languageFlags} ticket(s) contained strong or offensive language. The AI included a respectful-communication advisory in its response — consider following up if the pattern repeats from the same user.`,
       );
     if (!recommendations.length)
       recommendations.push("AI performance is healthy. Continue monitoring for drift over time.");
