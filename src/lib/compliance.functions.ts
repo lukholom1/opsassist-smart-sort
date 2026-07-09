@@ -14,7 +14,8 @@ export type DecisionAction =
   | "Solution recommendation"
   | "Escalation"
   | "Resolution"
-  | "Prediction";
+  | "Prediction"
+  | "Content moderation";
 
 export type DecisionEntry = {
   id: string;
