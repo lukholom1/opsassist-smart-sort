@@ -63,6 +63,7 @@ export type ComplianceReport = {
     avgConfidence: number;
     avgRating: number | null;
     rejectedAiCount: number;
+    languageFlags: number;
   };
   decisions: DecisionEntry[];
   transparency: TransparencyRow[];
