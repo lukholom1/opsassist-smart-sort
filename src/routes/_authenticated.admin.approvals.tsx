@@ -154,16 +154,7 @@ function ApprovalsPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
-          <Logo />
-          <Button asChild variant="outline" size="sm">
-            <Link to="/admin">
-              <ArrowLeft size={14} className="mr-1.5" /> Back to admin
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <AdminHeader />
 
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6">
