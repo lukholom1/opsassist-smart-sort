@@ -9,7 +9,7 @@ import {
   listApproverCandidates,
 } from "@/lib/workflow.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { Logo } from "@/components/Logo";
+import { AdminHeader } from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
