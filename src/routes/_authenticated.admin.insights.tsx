@@ -1,9 +1,9 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 // jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
 // (it touches window/document at module load).
-import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
+import { Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
 import { AdminHeader } from "@/components/AdminHeader";
 
 import { Button } from "@/components/ui/button";
@@ -279,12 +279,6 @@ function InsightsPage() {
                 : `Tickets, resolution metrics, and feedback for the ${department} team.`}
             </p>
           </div>
-          <Link
-            to="/admin"
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            ← Back to {isSuperAdmin ? "admin" : department} dashboard
-          </Link>
         </div>
 
         {/* Stat cards */}
