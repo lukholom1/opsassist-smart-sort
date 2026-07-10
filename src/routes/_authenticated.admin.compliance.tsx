@@ -1,8 +1,7 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   Loader2,
   Shield,
   Sparkles,
@@ -46,39 +45,85 @@ function CompliancePage() {
     };
   }, [fetchReport]);
 
-  function downloadReport() {
+  async function downloadReport() {
     if (!data) return;
-    const lines = [
-      `# OpsAssist Compliance Report`,
-      `Generated: ${new Date(data.generatedAt).toLocaleString()}`,
-      ``,
-      `## AI Activity`,
-      `- Tickets analyzed: ${data.totals.tickets}`,
-      `- AI responses generated: ${data.totals.aiResponses}`,
-      `- Tickets auto-classified: ${data.totals.autoClassified}`,
-      `- Resolved by AI: ${data.totals.resolvedByAi}`,
-      `- Average confidence: ${(data.totals.avgConfidence * 100).toFixed(0)}%`,
-      `- Average user rating: ${data.totals.avgRating ?? "n/a"}`,
-      ``,
-      `## Risk & Review`,
-      `- High-risk cases: ${data.totals.highRisk}`,
-      `- Human reviews required: ${data.totals.humanReviews}`,
-      `- Rejected AI suggestions: ${data.totals.rejectedAiCount}`,
-      `- Language moderation flags: ${data.totals.languageFlags}`,
-      ``,
-      `## Frequently Rejected Categories`,
-      ...data.topRejectedCategories.map((c) => `- ${c.category}: ${c.count}`),
-      ``,
-      `## Recommendations`,
-      ...data.recommendations.map((r, i) => `${i + 1}. ${r}`),
-    ];
-    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `compliance-report-${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const {
+      createReport,
+      finalizeReport,
+      sectionHeading,
+      paragraph,
+      kpiGrid,
+      keyValueList,
+      table,
+      bulletList,
+    } = await import("@/lib/pdf-report");
+
+    const ctx = await createReport({
+      title: "Compliance & Risk Report",
+      subtitle: "Governance, transparency and audit trail for AI-assisted operations",
+      scope: "All Departments",
+      generatedAt: new Date(data.generatedAt),
+    });
+
+    sectionHeading(ctx, "Executive Summary");
+    paragraph(
+      ctx,
+      `This report summarises AI activity, risk detection, and human oversight across ${data.totals.tickets} ticket(s). It highlights auto-classification quality, moderation flags, rejected suggestions, and the reviews still requiring administrator attention.`,
+      { muted: true },
+    );
+
+    sectionHeading(ctx, "AI Activity Overview");
+    kpiGrid(ctx, [
+      { label: "AI Responses", value: data.totals.aiResponses, tone: "purple" },
+      { label: "Auto-Classified", value: data.totals.autoClassified, tone: "success" },
+      { label: "High-Risk Cases", value: data.totals.highRisk, tone: "warning" },
+      { label: "Human Reviews", value: data.totals.humanReviews, tone: "blue" },
+    ]);
+
+    sectionHeading(ctx, "Governance Metrics");
+    keyValueList(ctx, [
+      ["Tickets analysed", data.totals.tickets],
+      ["Resolved by AI", data.totals.resolvedByAi],
+      ["Average confidence", `${(data.totals.avgConfidence * 100).toFixed(0)}%`],
+      ["Average user rating", data.totals.avgRating != null ? `${data.totals.avgRating} / 5` : "n/a"],
+      ["Rejected AI suggestions", data.totals.rejectedAiCount],
+      ["Language moderation flags", data.totals.languageFlags],
+    ]);
+
+    sectionHeading(ctx, "Frequently Rejected Categories");
+    if (data.topRejectedCategories.length) {
+      table(
+        ctx,
+        ["Category", "Rejections"],
+        data.topRejectedCategories.map((c) => [c.category, c.count]),
+      );
+    } else {
+      paragraph(ctx, "No categories with recurring rejections.", { muted: true });
+    }
+
+    if (data.reviewQueue?.length) {
+      sectionHeading(ctx, "Outstanding Human Review Queue");
+      table(
+        ctx,
+        ["Ticket", "Risk", "Department", "Status"],
+        data.reviewQueue.slice(0, 25).map((r) => [
+          `${r.ticketShort} — ${r.title}`,
+          r.level,
+          r.department,
+          r.status,
+        ]),
+      );
+    }
+
+    sectionHeading(ctx, "Recommendations");
+    if (data.recommendations.length) {
+      bulletList(ctx, data.recommendations, true);
+    } else {
+      paragraph(ctx, "No recommendations at this time.", { muted: true });
+    }
+
+    finalizeReport(ctx);
+    ctx.doc.save(`OpsAssist_Compliance_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
   return (
@@ -502,7 +547,7 @@ function ReportSummary({ data }: { data: ComplianceReport }) {
           <div className="flex-1">
             <h2 className="text-base font-semibold">Compliance Report Summary</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Click <span className="font-medium text-foreground">Generate Compliance Report</span> at the top to export the full report as Markdown.
+              Click <span className="font-medium text-foreground">Generate Compliance Report</span> at the top to export the full styled report as a PDF document.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>

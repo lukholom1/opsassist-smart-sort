@@ -132,69 +132,54 @@ function InsightsPage() {
         typeof report.narrative === "string" && report.narrative.length > 0
           ? report.narrative
           : "No narrative generated.";
-      const { default: jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const margin = 48;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      let y = margin;
+      const {
+        createReport,
+        finalizeReport,
+        sectionHeading,
+        paragraph,
+        kpiGrid,
+        keyValueList,
+      } = await import("@/lib/pdf-report");
 
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(18);
-      doc.text("OpsAssist — Insights Report", margin, y);
-      y += 22;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(11);
-      doc.setTextColor(110);
-      doc.text(`Scope: ${report.summary.scope}`, margin, y);
-      y += 14;
-      doc.text(
-        `Generated: ${new Date(report.summary.generated_at).toLocaleString()}`,
-        margin,
-        y,
+      const ctx = await createReport({
+        title: "Insights Report",
+        subtitle: "Operational performance, response quality and AI contribution",
+        scope: report.summary.scope,
+        generatedAt: new Date(report.summary.generated_at),
+      });
+
+      sectionHeading(ctx, "Headline Metrics");
+      kpiGrid(ctx, [
+        { label: "Total Tickets", value: report.summary.total_tickets, tone: "blue" },
+        { label: "Resolved", value: report.summary.resolved, tone: "success" },
+        { label: "Resolution Rate", value: `${report.summary.resolution_rate}%`, tone: "purple" },
+        { label: "Resolved by AI", value: report.summary.resolved_by_ai, tone: "purple" },
+      ]);
+
+      sectionHeading(ctx, "Performance Breakdown");
+      keyValueList(ctx, [
+        ["High priority", report.summary.by_priority.High],
+        ["Medium priority", report.summary.by_priority.Medium],
+        ["Low priority", report.summary.by_priority.Low],
+        [
+          "Average rating",
+          `${report.summary.avg_rating || "n/a"} / 5 (${report.summary.feedback_count} responses)`,
+        ],
+        ["Avg business-hours resolution", `${report.summary.avg_business_resolution_minutes} min`],
+      ]);
+
+      sectionHeading(
+        ctx,
+        `AI Narrative${report.source === "fallback" ? " (Auto-Generated)" : ""}`,
       );
-      y += 22;
-      doc.setTextColor(20);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Summary", margin, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const lines = [
-        `Total tickets: ${report.summary.total_tickets}`,
-        `Resolved: ${report.summary.resolved} (${report.summary.resolution_rate}%)`,
-        `Resolved by AI: ${report.summary.resolved_by_ai}`,
-        `Priority — High: ${report.summary.by_priority.High} · Medium: ${report.summary.by_priority.Medium} · Low: ${report.summary.by_priority.Low}`,
-        `Average rating: ${report.summary.avg_rating || "n/a"} / 5 (${report.summary.feedback_count} responses)`,
-        `Avg business-hours resolution: ${report.summary.avg_business_resolution_minutes} min`,
-      ];
-      for (const l of lines) {
-        doc.text(l, margin, y);
-        y += 14;
-      }
-      y += 10;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(
-        `AI Narrative${report.source === "fallback" ? " (auto-generated)" : ""}`,
-        margin,
-        y,
-      );
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const wrapped = doc.splitTextToSize(narrative, pageWidth - margin * 2);
-      for (const ln of wrapped) {
-        if (y > pageHeight - margin) {
-          doc.addPage();
-          y = margin;
-        }
-        doc.text(ln, margin, y);
-        y += 13;
-      }
+      // Break narrative into paragraphs for readability
+      const chunks = narrative.split(/\n\s*\n/).filter(Boolean);
+      if (chunks.length === 0) chunks.push(narrative);
+      for (const c of chunks) paragraph(ctx, c.trim());
+
+      finalizeReport(ctx);
       const fileScope = (report.summary.scope || "report").replace(/\s+/g, "_");
-      doc.save(
+      ctx.doc.save(
         `OpsAssist_Insights_${fileScope}_${new Date().toISOString().slice(0, 10)}.pdf`,
       );
     } catch (e) {
