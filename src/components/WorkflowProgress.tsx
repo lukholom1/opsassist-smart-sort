@@ -526,7 +526,11 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
       )}
 
       {/* Request-approval picker */}
-      {pickerOpen && (
+      {pickerOpen && (() => {
+        const eligibleDepts = DEPARTMENTS.filter((d) =>
+          candidates.some((c) => c.department === d && c.id !== userId),
+        );
+        return (
         <div className="mt-4 rounded-lg border border-border bg-card p-3">
           <div className="mb-2 text-sm font-semibold">Request approval from</div>
           <div className="grid gap-2">
@@ -534,17 +538,28 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Departments
               </div>
-              <div className="flex flex-wrap gap-3">
-                {DEPARTMENTS.map((d) => (
-                  <label key={d} className="flex cursor-pointer items-center gap-1.5 text-sm">
-                    <Checkbox
-                      checked={selectedDepts.has(d)}
-                      onCheckedChange={() => toggleDept(d)}
-                    />
-                    {d}
-                  </label>
-                ))}
-              </div>
+              {eligibleDepts.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border bg-muted/30 p-2 text-xs text-muted-foreground">
+                  No other eligible approvers are available. You are the only approver in every department.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {eligibleDepts.map((d) => (
+                    <label key={d} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                      <Checkbox
+                        checked={selectedDepts.has(d)}
+                        onCheckedChange={() => toggleDept(d)}
+                      />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              )}
+              {DEPARTMENTS.length !== eligibleDepts.length && eligibleDepts.length > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Departments where you are the sole approver are hidden.
+                </p>
+              )}
             </div>
             <div>
               <Label className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -565,14 +580,15 @@ export function WorkflowProgress({ ticketId }: { ticketId: string }) {
               <Button size="sm" variant="ghost" onClick={() => setPickerOpen(false)} disabled={busy}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={submitRequest} disabled={busy}>
+              <Button size="sm" onClick={submitRequest} disabled={busy || eligibleDepts.length === 0}>
                 {busy ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : null}
                 Send request
               </Button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Skip dialog */}
       {skipOpen && (
