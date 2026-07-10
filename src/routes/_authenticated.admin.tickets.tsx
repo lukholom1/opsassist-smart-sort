@@ -9,7 +9,7 @@ import {
   type AssignmentRow,
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { Logo } from "@/components/Logo";
+import { AdminHeader } from "@/components/AdminHeader";
 import { toast } from "sonner";
 import { dispatchTicketEmails } from "@/lib/emailService";
 
