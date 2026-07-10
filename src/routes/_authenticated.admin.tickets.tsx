@@ -9,7 +9,7 @@ import {
   type AssignmentRow,
 } from "@/lib/tickets.functions";
 import { useAuth } from "@/hooks/use-auth";
-import { Logo } from "@/components/Logo";
+import { AdminHeader } from "@/components/AdminHeader";
 import { toast } from "sonner";
 import { dispatchTicketEmails } from "@/lib/emailService";
 
@@ -229,33 +229,7 @@ function AdminTicketsPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
-          <Logo />
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link to="/admin">
-                <ArrowLeft size={14} className="mr-1.5" />
-                Back
-              </Link>
-            </Button>
-            <span className="hidden text-sm text-muted-foreground sm:inline">
-              {fullName ?? "Admin"}{" "}
-              {department && (
-                <span className="font-medium text-foreground">· {department}</span>
-              )}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="rounded-lg"
-            >
-              <LogOut size={14} className="mr-1.5" /> Sign out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
           {isSuperAdmin ? "All tickets" : `${department} tickets`}

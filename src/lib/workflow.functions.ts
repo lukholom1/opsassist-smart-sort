@@ -681,6 +681,26 @@ export const requestManualApprovals = createServerFn({ method: "POST" })
     const actorName = (context.profile as any)?.full_name ?? "Admin";
     const actorDept = (context.department as string | null) ?? null;
 
+    // Determine which departments have at least one eligible approver
+    // (admin/manager) other than the requesting admin. Requesting approval
+    // from a department where the caller is the only approver would be
+    // "approving yourself" — reject it up front.
+    const { data: eligibleRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id, profiles!inner(department)")
+      .in("role", ["admin", "manager"] as any);
+    const eligibleDepts = new Set<string>();
+    for (const r of (eligibleRoles ?? []) as any[]) {
+      const d = r.profiles?.department as string | null;
+      if (d && r.user_id !== context.userId) eligibleDepts.add(d);
+    }
+    const invalid = data.departments.filter((d) => !eligibleDepts.has(d));
+    if (invalid.length) {
+      throw new Error(
+        `You are the only approver in: ${invalid.join(", ")}. Pick a department with another eligible approver.`,
+      );
+    }
+
     const rows = data.departments.map((d) => ({
       ticket_id: data.ticket_id,
       stage_id: null,
