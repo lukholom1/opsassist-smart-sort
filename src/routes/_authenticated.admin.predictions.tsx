@@ -29,7 +29,7 @@ import {
   Bar,
   Cell,
 } from "recharts";
-import { Logo } from "@/components/Logo";
+import { AdminHeader } from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getWorkloadForecast, type Forecast } from "@/lib/predictions.functions";
