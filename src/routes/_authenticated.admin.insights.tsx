@@ -279,12 +279,6 @@ function InsightsPage() {
                 : `Tickets, resolution metrics, and feedback for the ${department} team.`}
             </p>
           </div>
-          <Link
-            to="/admin"
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            ← Back to {isSuperAdmin ? "admin" : department} dashboard
-          </Link>
         </div>
 
         {/* Stat cards */}
