@@ -547,7 +547,7 @@ function ReportSummary({ data }: { data: ComplianceReport }) {
           <div className="flex-1">
             <h2 className="text-base font-semibold">Compliance Report Summary</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Click <span className="font-medium text-foreground">Generate Compliance Report</span> at the top to export the full report as Markdown.
+              Click <span className="font-medium text-foreground">Generate Compliance Report</span> at the top to export the full styled report as a PDF document.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div>
