@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 // jsPDF is dynamically imported inside handleDownload to avoid SSR crashes
 // (it touches window/document at module load).
 import { ArrowLeft, Download, Loader2, RefreshCw, Sparkles, Brain, Clock, Wrench, TrendingUp, AlertTriangle } from "lucide-react";
-import { Logo } from "@/components/Logo";
+import { AdminHeader } from "@/components/AdminHeader";
 
 import { Button } from "@/components/ui/button";
 import {
