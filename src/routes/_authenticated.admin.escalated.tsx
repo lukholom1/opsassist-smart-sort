@@ -43,9 +43,10 @@ function EscalatedPage() {
   const [details, setDetails] = useState<any | null>(null);
   const [notes, setNotes] = useState<{ id: string; title: string; status: string } | null>(null);
 
-  // Redirect non-SuperAdmins away.
+  // Redirect non-SuperAdmins away. Wait until role is loaded to avoid a
+  // race where auth session is ready but the role query is still pending.
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || role === null) return;
     if (role !== "admin" || department !== null) {
       navigate({ to: "/admin", replace: true });
     }
