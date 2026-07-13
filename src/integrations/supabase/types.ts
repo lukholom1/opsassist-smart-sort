@@ -474,6 +474,14 @@ export type Database = {
           category: string
           created_at: string
           details: string
+          escalated: boolean
+          escalated_at: string | null
+          escalated_by: string | null
+          escalated_by_department: string | null
+          escalated_by_name: string | null
+          escalation_notes: string | null
+          escalation_reason: string | null
+          escalation_status: string | null
           id: string
           priority: string
           resolution_source: string | null
@@ -501,6 +509,14 @@ export type Database = {
           category: string
           created_at?: string
           details: string
+          escalated?: boolean
+          escalated_at?: string | null
+          escalated_by?: string | null
+          escalated_by_department?: string | null
+          escalated_by_name?: string | null
+          escalation_notes?: string | null
+          escalation_reason?: string | null
+          escalation_status?: string | null
           id?: string
           priority: string
           resolution_source?: string | null
@@ -528,6 +544,14 @@ export type Database = {
           category?: string
           created_at?: string
           details?: string
+          escalated?: boolean
+          escalated_at?: string | null
+          escalated_by?: string | null
+          escalated_by_department?: string | null
+          escalated_by_name?: string | null
+          escalation_notes?: string | null
+          escalation_reason?: string | null
+          escalation_status?: string | null
           id?: string
           priority?: string
           resolution_source?: string | null
