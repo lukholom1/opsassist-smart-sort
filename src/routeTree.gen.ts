@@ -18,6 +18,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated.
 import { Route as AuthenticatedAdminTicketsRouteImport } from './routes/_authenticated.admin.tickets'
 import { Route as AuthenticatedAdminPredictionsRouteImport } from './routes/_authenticated.admin.predictions'
 import { Route as AuthenticatedAdminInsightsRouteImport } from './routes/_authenticated.admin.insights'
+import { Route as AuthenticatedAdminEscalatedRouteImport } from './routes/_authenticated.admin.escalated'
 import { Route as AuthenticatedAdminComplianceRouteImport } from './routes/_authenticated.admin.compliance'
 import { Route as AuthenticatedAdminApprovalsRouteImport } from './routes/_authenticated.admin.approvals'
 import { Route as ApiPublicHooksAdminMessageFollowupRouteImport } from './routes/api/public/hooks/admin-message-followup'
@@ -69,6 +70,12 @@ const AuthenticatedAdminInsightsRoute =
     path: '/insights',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminEscalatedRoute =
+  AuthenticatedAdminEscalatedRouteImport.update({
+    id: '/escalated',
+    path: '/escalated',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminComplianceRoute =
   AuthenticatedAdminComplianceRouteImport.update({
     id: '/compliance',
@@ -96,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/it': typeof AuthenticatedItRoute
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/admin/compliance': typeof AuthenticatedAdminComplianceRoute
+  '/admin/escalated': typeof AuthenticatedAdminEscalatedRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -109,6 +117,7 @@ export interface FileRoutesByTo {
   '/it': typeof AuthenticatedItRoute
   '/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/admin/compliance': typeof AuthenticatedAdminComplianceRoute
+  '/admin/escalated': typeof AuthenticatedAdminEscalatedRoute
   '/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -124,6 +133,7 @@ export interface FileRoutesById {
   '/_authenticated/it': typeof AuthenticatedItRoute
   '/_authenticated/admin/approvals': typeof AuthenticatedAdminApprovalsRoute
   '/_authenticated/admin/compliance': typeof AuthenticatedAdminComplianceRoute
+  '/_authenticated/admin/escalated': typeof AuthenticatedAdminEscalatedRoute
   '/_authenticated/admin/insights': typeof AuthenticatedAdminInsightsRoute
   '/_authenticated/admin/predictions': typeof AuthenticatedAdminPredictionsRoute
   '/_authenticated/admin/tickets': typeof AuthenticatedAdminTicketsRoute
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/it'
     | '/admin/approvals'
     | '/admin/compliance'
+    | '/admin/escalated'
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/it'
     | '/admin/approvals'
     | '/admin/compliance'
+    | '/admin/escalated'
     | '/admin/insights'
     | '/admin/predictions'
     | '/admin/tickets'
@@ -166,6 +178,7 @@ export interface FileRouteTypes {
     | '/_authenticated/it'
     | '/_authenticated/admin/approvals'
     | '/_authenticated/admin/compliance'
+    | '/_authenticated/admin/escalated'
     | '/_authenticated/admin/insights'
     | '/_authenticated/admin/predictions'
     | '/_authenticated/admin/tickets'
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminInsightsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/escalated': {
+      id: '/_authenticated/admin/escalated'
+      path: '/escalated'
+      fullPath: '/admin/escalated'
+      preLoaderRoute: typeof AuthenticatedAdminEscalatedRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/compliance': {
       id: '/_authenticated/admin/compliance'
       path: '/compliance'
@@ -271,6 +291,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminApprovalsRoute: typeof AuthenticatedAdminApprovalsRoute
   AuthenticatedAdminComplianceRoute: typeof AuthenticatedAdminComplianceRoute
+  AuthenticatedAdminEscalatedRoute: typeof AuthenticatedAdminEscalatedRoute
   AuthenticatedAdminInsightsRoute: typeof AuthenticatedAdminInsightsRoute
   AuthenticatedAdminPredictionsRoute: typeof AuthenticatedAdminPredictionsRoute
   AuthenticatedAdminTicketsRoute: typeof AuthenticatedAdminTicketsRoute
@@ -279,6 +300,7 @@ interface AuthenticatedAdminRouteChildren {
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminApprovalsRoute: AuthenticatedAdminApprovalsRoute,
   AuthenticatedAdminComplianceRoute: AuthenticatedAdminComplianceRoute,
+  AuthenticatedAdminEscalatedRoute: AuthenticatedAdminEscalatedRoute,
   AuthenticatedAdminInsightsRoute: AuthenticatedAdminInsightsRoute,
   AuthenticatedAdminPredictionsRoute: AuthenticatedAdminPredictionsRoute,
   AuthenticatedAdminTicketsRoute: AuthenticatedAdminTicketsRoute,

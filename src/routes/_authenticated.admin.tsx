@@ -38,7 +38,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ClipboardCheck, Menu } from "lucide-react";
+import { LogOut, Loader2, UserPlus, Copy, Check, Users, Mail, Trash2, BarChart3, TicketCheck, TrendingUp, CheckCircle2, Sparkles, Star, LineChart, Shield, ClipboardCheck, ShieldAlert, Menu } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — OpsAssist" }] }),
@@ -82,6 +82,11 @@ function AdminPage() {
       <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
         <Link to="/admin/compliance"><Shield size={14} className="mr-1.5" />Compliance</Link>
       </Button>
+      {isSuperAdmin && (
+        <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10">
+          <Link to="/admin/escalated"><ShieldAlert size={14} className="mr-1.5" />Escalated</Link>
+        </Button>
+      )}
       {isSuperAdmin && (
         <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="w-full sm:w-auto justify-start sm:justify-center rounded-lg">
           <Users size={14} className="mr-1.5" /> Users

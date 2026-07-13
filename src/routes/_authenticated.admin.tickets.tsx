@@ -80,6 +80,12 @@ type Ticket = {
   feedback: { rating: number; comment: string | null } | null;
   last_note_at: string | null;
   last_note_role: "user" | "admin" | null;
+  escalated?: boolean | null;
+  escalation_reason?: string | null;
+  escalation_notes?: string | null;
+  escalated_by_name?: string | null;
+  escalated_by_department?: string | null;
+  escalated_at?: string | null;
 };
 
 
