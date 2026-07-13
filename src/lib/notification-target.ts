@@ -44,6 +44,14 @@ export function getNotificationTarget(
           ? { to: ticketRoute, search: { ticket: ticketId } }
           : fallback;
 
+    case "ticket_escalated":
+      // SuperAdmin queue; other admins fall back to the ticket view.
+      return isAdminViewer
+        ? { to: "/admin/escalated" }
+        : ticketId
+          ? { to: ticketRoute, search: { ticket: ticketId } }
+          : fallback;
+
     case "approval_approved":
     case "approval_rejected":
     case "approval_info_requested":
