@@ -65,30 +65,37 @@ function AdminPage() {
     navigate({ to: "/login" });
   }
 
+  const initials = (fullName ?? "A")
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   const navLinks = (
     <>
       <Button asChild size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95">
         <Link to="/admin/tickets"><TicketCheck size={14} className="mr-1.5" />Tickets</Link>
       </Button>
-      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg">
+      <Button asChild variant="ghost" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent">
         <Link to="/admin/insights"><BarChart3 size={14} className="mr-1.5" />Insights</Link>
       </Button>
-      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10">
+      <Button asChild variant="ghost" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-success hover:text-success hover:bg-success/10">
         <Link to="/admin/approvals"><ClipboardCheck size={14} className="mr-1.5" />Approvals</Link>
       </Button>
-      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
+      <Button asChild variant="ghost" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-purple-accent hover:text-purple-accent hover:bg-purple-accent/10">
         <Link to="/admin/predictions"><LineChart size={14} className="mr-1.5" />Predictions</Link>
       </Button>
-      <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-purple-accent/40 text-purple-accent hover:bg-purple-accent/10">
+      <Button asChild variant="ghost" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-purple-accent hover:text-purple-accent hover:bg-purple-accent/10">
         <Link to="/admin/compliance"><Shield size={14} className="mr-1.5" />Compliance</Link>
       </Button>
       {isSuperAdmin && (
-        <Button asChild variant="outline" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg border-destructive/40 text-destructive hover:bg-destructive/10">
+        <Button asChild variant="ghost" size="sm" className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10">
           <Link to="/admin/escalated"><ShieldAlert size={14} className="mr-1.5" />Escalated</Link>
         </Button>
       )}
       {isSuperAdmin && (
-        <Button variant="outline" size="sm" onClick={() => setShowUsers(true)} className="w-full sm:w-auto justify-start sm:justify-center rounded-lg">
+        <Button variant="ghost" size="sm" onClick={() => setShowUsers(true)} className="w-full sm:w-auto justify-start sm:justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent">
           <Users size={14} className="mr-1.5" /> Users
         </Button>
       )}
@@ -97,18 +104,29 @@ function AdminPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 h-14">
           <Logo />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {/* Desktop nav */}
-            <div className="hidden lg:flex items-center gap-2">{navLinks}</div>
+            <div className="hidden lg:flex items-center gap-1">{navLinks}</div>
             <NotificationsBell />
-            <span className="hidden xl:inline text-sm text-muted-foreground truncate max-w-[180px]">
-              {fullName ?? "Admin"} {department && <span className="font-medium text-foreground">· {department}</span>}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="hidden sm:inline-flex rounded-lg">
-              <LogOut size={14} className="mr-1.5" /> Sign out
+            <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-card/60 pl-2.5 pr-1 py-1">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-[image:var(--gradient-hero)] text-[10px] font-semibold text-white">
+                {initials}
+              </span>
+              <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+                {fullName ?? "Admin"}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="hidden sm:inline-flex rounded-lg text-muted-foreground hover:text-foreground"
+              aria-label="Sign out"
+            >
+              <LogOut size={14} className="sm:mr-1.5" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
             {/* Mobile menu */}
             <Sheet>
@@ -131,13 +149,20 @@ function AdminPage() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
-          {isSuperAdmin ? "Admin dashboard" : `${department} dashboard`}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          A live snapshot of ticket activity. Open <span className="font-medium text-foreground">Tickets</span> to manage requests, or jump to <span className="font-medium text-foreground">Insights</span> for the full report.
-        </p>
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 sm:py-10">
+        {/* Hero */}
+        <div className="flex flex-col gap-3">
+          <div className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-card/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+            {isSuperAdmin ? "SuperAdmin console" : `${department} workspace`}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            {isSuperAdmin ? "Admin dashboard" : `${department} dashboard`}
+          </h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            A live snapshot of ticket activity. Open <span className="font-medium text-foreground">Tickets</span> to manage requests, or jump to <span className="font-medium text-foreground">Insights</span> for the full report.
+          </p>
+        </div>
 
         <TicketAnalyticsSection />
       </main>
