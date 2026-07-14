@@ -137,125 +137,198 @@ function DashboardPage() {
     navigate({ to: "/login" });
   }
 
+  const openCount = tickets.filter((t) => t.status === "Open").length;
+  const inProgressCount = tickets.filter((t) => t.status === "In Progress").length;
+  const resolvedCount = tickets.filter((t) => t.status === "Resolved").length;
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-border bg-card/40 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4">
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 h-14">
           <Logo />
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <NotificationsBell />
-            <span className="hidden text-sm text-muted-foreground md:inline truncate max-w-[180px]">
-              Hi, <span className="font-medium text-foreground">{fullName ?? "there"}</span>
-            </span>
-            <Button variant="outline" size="sm" onClick={handleSignOut} className="rounded-lg">
-              <LogOut size={14} className="mr-1.5" /> <span className="hidden sm:inline">Sign out</span>
+            <div className="hidden md:flex items-center gap-2 rounded-full border border-border bg-card/60 pl-2.5 pr-1 py-1">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-[image:var(--gradient-hero)] text-[10px] font-semibold text-white">
+                {(fullName ?? "U").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase()}
+              </span>
+              <span className="text-xs text-muted-foreground truncate max-w-[140px]">
+                {fullName ?? "You"}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="rounded-lg text-muted-foreground hover:text-foreground"
+              aria-label="Sign out"
+            >
+              <LogOut size={14} className="sm:mr-1.5" /> <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
+        {/* Hero */}
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">My tickets</h1>
-            <p className="text-sm text-muted-foreground">
-              Submit a new request and track its progress per department.
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" /> Live workspace
+            </div>
+            <h1 className="mt-3 text-2xl sm:text-3xl font-semibold tracking-tight">
+              Welcome back{fullName ? `, ${fullName.split(" ")[0]}` : ""}.
+            </h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Submit requests, chat with AI, and follow every department in one place.
             </p>
           </div>
           <Button
             onClick={() => setShowForm(true)}
-            className="w-full sm:w-auto rounded-xl bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] hover:opacity-95"
+            className="group h-10 w-full sm:w-auto rounded-lg bg-[image:var(--gradient-hero)] text-white shadow-[var(--shadow-glow)] transition hover:opacity-95 active:scale-[0.98]"
           >
-            <Plus size={16} className="mr-1.5" /> New ticket
+            <Plus size={16} className="mr-1.5 transition group-hover:rotate-90" /> New ticket
           </Button>
         </div>
 
-
-        <div className="mt-6 grid gap-3">
-          {loading ? (
-            <div className="flex items-center justify-center rounded-2xl border border-border bg-card py-16 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...
+        {/* KPI strip */}
+        <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { label: "Open", value: openCount, dot: "bg-soft-blue" },
+            { label: "In progress", value: inProgressCount, dot: "bg-warning" },
+            { label: "Resolved", value: resolvedCount, dot: "bg-success" },
+          ].map((k) => (
+            <div
+              key={k.label}
+              className="rounded-xl border border-border bg-card/60 px-3 sm:px-4 py-3 backdrop-blur transition hover:border-border/80 hover:bg-card"
+            >
+              <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <span className={`h-1.5 w-1.5 rounded-full ${k.dot}`} /> {k.label}
+              </div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums">{k.value}</div>
             </div>
+          ))}
+        </div>
+
+        {/* Tickets list */}
+        <div className="mt-8 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Your tickets</h2>
+          <span className="text-xs text-muted-foreground tabular-nums">{tickets.length} total</span>
+        </div>
+
+        <div className="mt-3 grid gap-2.5">
+          {loading ? (
+            <>
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-[112px] rounded-xl border border-border bg-card/50 animate-pulse"
+                />
+              ))}
+            </>
           ) : tickets.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center text-sm text-muted-foreground">
-              You don't have any tickets yet. Click <span className="font-semibold text-foreground">New ticket</span> to start.
+            <div className="rounded-xl border border-dashed border-border bg-card/40 py-16 px-6 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[image:var(--gradient-hero)] shadow-[var(--shadow-glow)]">
+                <Plus size={20} className="text-white" />
+              </div>
+              <h3 className="mt-4 text-sm font-semibold text-foreground">No tickets yet</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Submit your first request and let AI route it to the right team.
+              </p>
+              <Button
+                onClick={() => setShowForm(true)}
+                size="sm"
+                className="mt-4 rounded-lg bg-[image:var(--gradient-hero)] text-white hover:opacity-95"
+              >
+                <Plus size={14} className="mr-1.5" /> Create ticket
+              </Button>
             </div>
           ) : (
             tickets.map((t) => {
               const unreadCount = t.status !== "Resolved" ? (unreadCounts[t.id] ?? 0) : 0;
               const dimmed = t.status === "Resolved" && !!t.feedback;
+              const statusDot =
+                t.status === "Open"
+                  ? "bg-soft-blue"
+                  : t.status === "In Progress"
+                  ? "bg-warning"
+                  : "bg-success";
               return (
-              <div
-                key={t.id}
-                className={`rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-soft)] transition ${dimmed ? "opacity-60 grayscale" : ""}`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-foreground">{t.title}</h3>
-                      {t.resolved_by_ai && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-accent ring-1 ring-inset ring-purple-accent/20">
-                          <Bot size={10} /> Resolved by AI
-                        </span>
+                <div
+                  key={t.id}
+                  className={`group rounded-xl border border-border bg-card/70 p-4 sm:p-5 shadow-[var(--shadow-soft)] transition duration-200 hover:border-border/80 hover:bg-card ${
+                    dimmed ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} aria-hidden />
+                        <h3 className="text-[15px] font-semibold text-foreground truncate">{t.title}</h3>
+                        {t.resolved_by_ai && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-purple-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-accent ring-1 ring-inset ring-purple-accent/25">
+                            <Bot size={10} /> AI
+                          </span>
+                        )}
+                        {dimmed && (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-inset ring-border">
+                            Closed
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.details}</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <CategoryPills values={t.categories} />
+                        <PriorityPill value={t.priority} />
+                        <span className="text-muted-foreground">· {elapsed(t.created_at, t.resolved_at)}</span>
+                      </div>
+                      {t.assignments.length > 0 && (
+                        <div className="mt-2">
+                          <DepartmentStatusPills assignments={t.assignments} />
+                        </div>
                       )}
-                      {dimmed && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ring-1 ring-inset ring-border">
-                          Closed
-                        </span>
+                      {t.feedback && (
+                        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Your rating:</span>
+                          <RatingStars value={t.feedback.rating} size={12} />
+                        </div>
                       )}
                     </div>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.details}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      <CategoryPills values={t.categories} />
-                      <PriorityPill value={t.priority} />
-                      <span className="text-muted-foreground">· {elapsed(t.created_at, t.resolved_at)}</span>
-                    </div>
-                    {t.assignments.length > 0 && (
-                      <div className="mt-2">
-                        <DepartmentStatusPills assignments={t.assignments} />
-                      </div>
-                    )}
-                    {t.feedback && (
-                      <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>Your rating:</span>
-                        <RatingStars value={t.feedback.rating} size={12} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setChatTicket(t)}
-                      className="relative rounded-full"
-                    >
-                      <Bot size={14} className="mr-1.5 text-purple-accent" /> Chatbot
-                      {unreadCount > 0 && (
-                        <span
-                          className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
-                          aria-label={`${unreadCount} new message${unreadCount > 1 ? "s" : ""}`}
-                        >
-                          {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
-                      )}
-                    </Button>
-                    {t.status === "Resolved" && !t.feedback && (
+                    <div className="flex flex-col gap-2">
                       <Button
+                        variant="outline"
                         size="sm"
-                        onClick={() => setRateTicket(t)}
-                        className="rounded-full bg-warning text-warning-foreground hover:bg-warning/90"
+                        onClick={() => setChatTicket(t)}
+                        className="relative rounded-lg border-border bg-background/40 hover:bg-accent"
                       >
-                        Rate experience
+                        <Bot size={14} className="mr-1.5 text-purple-accent" /> Chatbot
+                        {unreadCount > 0 && (
+                          <span
+                            className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground ring-2 ring-card"
+                            aria-label={`${unreadCount} new message${unreadCount > 1 ? "s" : ""}`}
+                          >
+                            {unreadCount > 9 ? "9+" : unreadCount}
+                          </span>
+                        )}
                       </Button>
-                    )}
+                      {t.status === "Resolved" && !t.feedback && (
+                        <Button
+                          size="sm"
+                          onClick={() => setRateTicket(t)}
+                          className="rounded-lg bg-warning text-warning-foreground hover:bg-warning/90"
+                        >
+                          Rate experience
+                        </Button>
+                      )}
+                    </div>
                   </div>
-
                 </div>
-              </div>
               );
             })
           )}
         </div>
       </main>
+
 
       {showForm && (
         <NewTicketDialog
